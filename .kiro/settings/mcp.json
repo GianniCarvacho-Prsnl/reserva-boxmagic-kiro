@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "browser_navigate",
+        "browser_type",
+        "browser_click",
+        "browser_wait_for",
+        "browser_close"
+      ]
+    },
+    "github": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-git"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "git_status",
+        "git_init",
+        "git_add",
+        "git_commit"
+      ]
+    }
+  }
+}

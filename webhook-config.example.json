@@ -1,0 +1,161 @@
+{
+  "webhookExamples": {
+    "description": "Example webhook configurations for different services",
+    "note": "Copy the appropriate configuration to your config.json or environment variables",
+    
+    "slack": {
+      "webhookUrl": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
+      "description": "Slack webhook for team notifications",
+      "format": "slack",
+      "example_payload": {
+        "text": "CrossFit Reservation Update",
+        "attachments": [
+          {
+            "color": "good",
+            "title": "✅ CrossFit Reservation Success",
+            "fields": [
+              {
+                "title": "Class",
+                "value": "18:00 CrossFit",
+                "short": true
+              },
+              {
+                "title": "Timing Accuracy",
+                "value": "25ms",
+                "short": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+
+    "discord": {
+      "webhookUrl": "https://discord.com/api/webhooks/YOUR/DISCORD/WEBHOOK",
+      "description": "Discord webhook for personal notifications",
+      "format": "discord",
+      "example_payload": {
+        "embeds": [
+          {
+            "title": "CrossFit Reservation Success",
+            "color": 65280,
+            "fields": [
+              {
+                "name": "Class",
+                "value": "18:00 CrossFit",
+                "inline": true
+              },
+              {
+                "name": "Result",
+                "value": "Reservation successful",
+                "inline": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+
+    "teams": {
+      "webhookUrl": "https://outlook.office.com/webhook/YOUR/TEAMS/WEBHOOK",
+      "description": "Microsoft Teams webhook for work notifications",
+      "format": "teams",
+      "example_payload": {
+        "@type": "MessageCard",
+        "@context": "https://schema.org/extensions",
+        "summary": "CrossFit Reservation Success",
+        "themeColor": "00FF00",
+        "sections": [
+          {
+            "activityTitle": "CrossFit Reservation Success",
+            "activitySubtitle": "18:00 CrossFit",
+            "facts": [
+              {
+                "name": "Schedule ID",
+                "value": "crossfit-monday-18"
+              },
+              {
+                "name": "Timing Accuracy",
+                "value": "25ms"
+              }
+            ]
+          }
+        ]
+      }
+    },
+
+    "zapier": {
+      "webhookUrl": "https://hooks.zapier.com/hooks/catch/YOUR/ZAPIER/WEBHOOK",
+      "description": "Zapier webhook for automation workflows",
+      "format": "generic",
+      "note": "Zapier receives the full payload and can trigger various actions"
+    },
+
+    "generic": {
+      "webhookUrl": "https://your-custom-endpoint.com/webhook",
+      "description": "Generic webhook for custom integrations",
+      "format": "generic",
+      "example_payload": {
+        "timestamp": "2024-01-15T17:00:00.000Z",
+        "success": true,
+        "scheduleId": "crossfit-monday-18",
+        "className": "18:00 CrossFit",
+        "reservationResult": {
+          "success": true,
+          "message": "Reservation successful",
+          "timingAccuracy": 25,
+          "hasSpots": true,
+          "participantCount": "8/15",
+          "classStatus": "already_booked"
+        },
+        "timingMetrics": {
+          "preparationDuration": 15000,
+          "executionDuration": 75,
+          "targetAccuracy": 25,
+          "totalDuration": 15075
+        },
+        "summary": {
+          "totalLogs": 15,
+          "errorCount": 0,
+          "warningCount": 1,
+          "phases": ["preparation", "execution", "verification"],
+          "duration": 15075
+        },
+        "metadata": {
+          "botVersion": "1.0.0",
+          "environment": "production",
+          "timezone": "America/Santiago"
+        },
+        "logs": [
+          {
+            "timestamp": "2024-01-15T17:00:00.000Z",
+            "level": "INFO",
+            "message": "Reservation completed",
+            "component": "ReservationBot"
+          }
+        ]
+      }
+    }
+  },
+
+  "environment_variables": {
+    "description": "Environment variables for webhook configuration",
+    "variables": {
+      "WEBHOOK_URL": "https://your-webhook-endpoint.com/notify",
+      "NOTIFICATIONS_ENABLED": "true"
+    }
+  },
+
+  "testing": {
+    "description": "How to test your webhook configuration",
+    "steps": [
+      "1. Set your WEBHOOK_URL environment variable",
+      "2. Set NOTIFICATIONS_ENABLED=true",
+      "3. Run the bot with a test configuration",
+      "4. Check your webhook endpoint for the test notification",
+      "5. Verify the payload format matches your expectations"
+    ],
+    "test_command": "npm test -- webhook",
+    "manual_test": "You can also use the Logger.sendTestWebhookNotification() method"
+  }
+}

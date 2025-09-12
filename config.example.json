@@ -1,0 +1,64 @@
+{
+  "schedules": [
+    {
+      "id": "metcon-viernes-18",
+      "dayToSelect": "tomorrow",
+      "className": "METCON",
+      "reservationTime": "2024-09-19T17:00:00-03:00",
+      "bufferSeconds": 30,
+      "enabled": true,
+      "cronExpression": "0 17 * * 4",
+      "description": "Reservar METCON del viernes 18:00 (se abre jueves 17:00)"
+    },
+    {
+      "id": "crossfit-lunes-18",
+      "dayToSelect": "tomorrow",
+      "className": "18:00 CrossFit",
+      "reservationTime": "2024-09-22T17:00:00-03:00",
+      "bufferSeconds": 30,
+      "enabled": true,
+      "cronExpression": "0 17 * * 0",
+      "description": "Reservar CrossFit del lunes 18:00 (se abre domingo 17:00)"
+    },
+    {
+      "id": "crossfit-martes-19",
+      "dayToSelect": "tomorrow",
+      "className": "19:00 CrossFit",
+      "reservationTime": "2024-09-23T18:00:00-03:00",
+      "bufferSeconds": 30,
+      "enabled": true,
+      "cronExpression": "0 18 * * 1",
+      "description": "Reservar CrossFit del martes 19:00 (se abre lunes 18:00)"
+    },
+    {
+      "id": "crossfit-miercoles-18",
+      "dayToSelect": "tomorrow",
+      "className": "18:00 CrossFit",
+      "reservationTime": "2024-09-24T17:00:00-03:00",
+      "bufferSeconds": 30,
+      "enabled": true,
+      "cronExpression": "0 17 * * 2",
+      "description": "Reservar CrossFit del miércoles 18:00 (se abre martes 17:00)"
+    },
+    {
+      "id": "crossfit-jueves-19",
+      "dayToSelect": "tomorrow",
+      "className": "19:00 CrossFit",
+      "reservationTime": "2024-09-25T18:00:00-03:00",
+      "bufferSeconds": 30,
+      "enabled": true,
+      "cronExpression": "0 18 * * 3",
+      "description": "Reservar CrossFit del jueves 19:00 (se abre miércoles 18:00)"
+    },
+    {
+      "id": "crossfit-sabado-10",
+      "dayToSelect": "tomorrow",
+      "className": "10:00 CrossFit",
+      "reservationTime": "2024-09-27T09:00:00-03:00",
+      "bufferSeconds": 30,
+      "enabled": true,
+      "cronExpression": "0 9 * * 5",
+      "description": "Reservar CrossFit del sábado 10:00 (se abre viernes 09:00)"
+    }
+  ]
+}

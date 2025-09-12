@@ -1,0 +1,52 @@
+{
+  "name": "crossfit-reservation-bot",
+  "version": "1.0.0",
+  "description": "Automated CrossFit class reservation bot for BoxMagic",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "dev:server": "tsx src/server.ts",
+    "start": "node dist/index.js",
+    "start:server": "node dist/server.js",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "lint": "eslint src/**/*.ts",
+    "clean": "rm -rf dist",
+    "vercel:dev": "vercel dev",
+    "vercel:deploy": "vercel --prod",
+    "fly:deploy": "fly deploy",
+    "fly:logs": "fly logs"
+  },
+  "keywords": [
+    "crossfit",
+    "automation",
+    "reservation",
+    "playwright",
+    "bot"
+  ],
+  "author": "GT Carvacho",
+  "license": "MIT",
+  "dependencies": {
+    "date-fns": "^2.30.0",
+    "date-fns-tz": "^2.0.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.21.2",
+    "playwright": "^1.40.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.23",
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vercel/node": "^3.2.29",
+    "eslint": "^8.54.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

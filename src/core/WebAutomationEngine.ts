@@ -1,0 +1,1414 @@
+import { chromium } from 'playwright';
+import type { Browser, BrowserContext, Page } from 'playwright';
+import { Logger } from './Logger.js';
+import type { ReservationResult } from '../types/ReservationTypes.js';
+
+// Selectores específicos basados en la exploración real del sitio BoxMagic
+export const SELECTORS = {
+  login: {
+    email: 'input[name="email"]',
+    password: 'input[type="password"]',
+    submitButton: 'button[type="submit"]:has-text("Ingresar")'
+  },
+  navigation: {
+    // Selectores dinámicos basados en la imagen observada
+    daySelector: (day: string) => `text=${day}.`, // ej: "jue.", "vie."
+    dayNumber: (number: string) => `text=${number}`, // ej: "11", "12"
+    todayButton: 'text=Hoy',
+    tomorrowButton: 'text=Mañana'
+  },
+  classes: {
+    classHeading: (className: string) => `h3:has-text("${className}"), h4:has-text("${className}"), [role="heading"]:has-text("${className}")`,
+    availableSpaces: 'text=Espacios disponibles',
+    fullCapacity: 'text=Capacidad completa',
+    alreadyBooked: 'text=Agendada',
+    classList: '.class-list, [data-testid="class-list"], .schedule-container'
+  },
+  modal: {
+    reserveButton: 'button:has-text("Agendar")',
+    reservingButton: 'button:has-text("Agendando")',
+    closeButton: 'button[aria-label="Close"], button:has-text("×"), button:has-text("Cerrar")',
+    participantInfo: 'text=Participantes'
+  },
+  popups: {
+    okButton: 'button:has-text("OK"), button:has-text("Aceptar")',
+    closeButton: 'button:has-text("×"), button[aria-label="Close"]',
+    dismissButton: 'button:has-text("Entendido"), button:has-text("Cerrar")'
+  }
+} as const;
+
+export interface WebAutomationEngine {
+  initialize(): Promise<void>;
+  login(email: string, password: string): Promise<boolean>;
+  navigateToSchedule(): Promise<void>;
+  selectDay(dayToSelect: 'today' | 'tomorrow'): Promise<void>;
+  waitUntilReady(): Promise<void>;
+  prepareReservation(email: string, password: string, dayToSelect: 'today' | 'tomorrow', className: string): Promise<void>;
+  executeReservation(className: string): Promise<ReservationResult>;
+  executeReservationUltraFast(className: string): Promise<ReservationResult>;
+  verifyReservationSuccess(className: string): Promise<ReservationResult>;
+  verifyReservationWithFailureTypes(className: string): Promise<ReservationResult & {
+    failureType?: 'network_error' | 'capacity_full' | 'already_booked' | 'session_expired' | 'class_not_found' | 'unknown';
+    participantCountChange?: {
+      changed: boolean;
+      previousCount?: { current: number; max: number };
+      newCount?: { current: number; max: number };
+      increased: boolean;
+    };
+  }>;
+  detectParticipantCountChange(className: string, previousCount?: { current: number; max: number }): Promise<{
+    changed: boolean;
+    previousCount?: { current: number; max: number };
+    newCount?: { current: number; max: number };
+    increased: boolean;
+  }>;
+  checkClassStatus(className: string): Promise<'available' | 'full' | 'already_booked' | 'not_found'>;
+  handlePopups(): Promise<void>;
+  cleanup(): Promise<void>;
+}
+
+export class WebAutomationEngine implements WebAutomationEngine {
+  private browser: Browser | null = null;
+  private context: BrowserContext | null = null;
+  private page: Page | null = null;
+  private logger: Logger;
+  private isInitialized = false;
+
+  constructor(logger?: Logger) {
+    this.logger = logger || new Logger();
+  }
+
+  async initialize(): Promise<void> {
+    if (this.isInitialized) {
+      this.logger.logInfo('WebAutomationEngine already initialized');
+      return;
+    }
+
+    try {
+      this.logger.logInfo('Initializing WebAutomationEngine with optimized browser configuration');
+      
+      // Configuración de navegador optimizada para velocidad
+      this.browser = await chromium.launch({
+        headless: process.env['BROWSER_HEADLESS'] !== 'false',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-background-networking',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows'
+        ]
+      });
+
+      this.context = await this.browser.newContext({
+        viewport: { width: 1280, height: 720 },
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      });
+
+      this.page = await this.context.newPage();
+      
+      // Configuración de página optimizada para velocidad
+      this.page.setDefaultTimeout(parseInt(process.env['BROWSER_TIMEOUT'] || '30000'));
+      
+      this.isInitialized = true;
+      this.logger.logInfo('WebAutomationEngine initialized successfully');
+    } catch (error) {
+      this.logger.logError(error as Error, { context: 'WebAutomationEngine.initialize' });
+      throw error;
+    }
+  }
+
+  async login(email: string, password: string): Promise<boolean> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo('Starting login process', { email });
+
+      // Navegar a la página de login
+      await this.navigateToSchedule();
+
+      // Esperar a que aparezca el formulario de login
+      await this.page.waitForSelector(SELECTORS.login.email, { timeout: 10000 });
+
+      // Llenar credenciales
+      await this.page.fill(SELECTORS.login.email, email);
+      await this.page.fill(SELECTORS.login.password, password);
+
+      this.logger.logInfo('Credentials filled, submitting login form');
+
+      // Enviar formulario
+      await this.page.click(SELECTORS.login.submitButton);
+
+      // Esperar a que el login se complete (verificar que ya no estamos en la página de login)
+      await this.page.waitForFunction(() => {
+        return !document.querySelector('input[name="email"]') || 
+               document.querySelector('text=Horarios') ||
+               document.querySelector('[data-testid="schedule"]') ||
+               window.location.pathname.includes('/horarios');
+      }, { timeout: 15000 });
+
+      // Manejar popups informativos después del login
+      await this.handlePopups();
+
+      this.logger.logInfo('Login completed successfully');
+      return true;
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.login',
+        email 
+      });
+      return false;
+    }
+  }
+
+  async navigateToSchedule(): Promise<void> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo('Navigating to BoxMagic schedule page');
+      
+      await this.page.goto('https://members.boxmagic.app/app/horarios', {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
+
+      this.logger.logInfo('Successfully navigated to schedule page');
+    } catch (error) {
+      this.logger.logError(error as Error, { context: 'WebAutomationEngine.navigateToSchedule' });
+      throw error;
+    }
+  }
+
+  async handlePopups(): Promise<void> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo('Checking for and handling popups');
+
+      // Esperar un momento para que aparezcan los popups
+      await this.page.waitForTimeout(2000);
+
+      // Intentar cerrar popups comunes
+      const popupSelectors = [
+        SELECTORS.popups.okButton,
+        SELECTORS.popups.closeButton,
+        SELECTORS.popups.dismissButton
+      ];
+
+      for (const selector of popupSelectors) {
+        try {
+          const element = await this.page.locator(selector).first();
+          if (await element.isVisible({ timeout: 1000 })) {
+            await element.click();
+            this.logger.logInfo(`Closed popup with selector: ${selector}`);
+            await this.page.waitForTimeout(500); // Esperar a que se cierre
+          }
+        } catch {
+          // Ignorar si el popup no existe
+        }
+      }
+
+      this.logger.logInfo('Popup handling completed');
+    } catch (error) {
+      this.logger.logError(error as Error, { context: 'WebAutomationEngine.handlePopups' });
+      // No lanzar error aquí, los popups son opcionales
+    }
+  }
+
+  async selectDay(dayToSelect: 'today' | 'tomorrow'): Promise<void> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo(`Selecting day: ${dayToSelect}`);
+
+      // Esperar a que la página de horarios esté cargada
+      await this.page.waitForLoadState('domcontentloaded');
+
+      // Buscar y hacer clic en el botón correspondiente
+      const buttonSelector = dayToSelect === 'today' 
+        ? SELECTORS.navigation.todayButton 
+        : SELECTORS.navigation.tomorrowButton;
+
+      const dayButton = this.page.locator(buttonSelector).first();
+      
+      if (await dayButton.isVisible({ timeout: 5000 })) {
+        await dayButton.click();
+        this.logger.logInfo(`Clicked ${dayToSelect} button`);
+        
+        // Esperar a que se cargue la lista de clases del día seleccionado
+        await this.waitForClassListToLoad();
+      } else {
+        this.logger.logInfo(`${dayToSelect} button not found, assuming we're already on the correct day`);
+      }
+
+      // Verificar que estamos en el día correcto
+      await this.verifyCorrectDay(dayToSelect);
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.selectDay',
+        dayToSelect 
+      });
+      throw error;
+    }
+  }
+
+  private async waitForClassListToLoad(): Promise<void> {
+    if (!this.page) return;
+
+    try {
+      // Esperar a que aparezca al menos una clase o el contenedor de clases
+      await this.page.waitForFunction(() => {
+        const classElements = document.querySelectorAll('h3, h4, [role="heading"]');
+        return classElements.length > 0 || 
+               document.querySelector('.class-list') ||
+               document.querySelector('[data-testid="class-list"]') ||
+               document.querySelector('.schedule-container');
+      }, { timeout: 10000 });
+
+      this.logger.logInfo('Class list loaded successfully');
+    } catch (error) {
+      this.logger.logError(error as Error, { context: 'WebAutomationEngine.waitForClassListToLoad' });
+      throw new Error('Failed to load class list');
+    }
+  }
+
+  async verifyClassListLoaded(): Promise<boolean> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo('Verifying that class list is loaded');
+
+      // Verificar que hay al menos una clase visible
+      const classCount = await this.page.locator('h3, h4, [role="heading"]').count();
+      
+      if (classCount > 0) {
+        this.logger.logInfo(`Class list verified: found ${classCount} classes`);
+        return true;
+      }
+
+      // Verificar contenedores alternativos
+      const hasContainer = await this.page.locator('.class-list, [data-testid="class-list"], .schedule-container').count() > 0;
+      
+      if (hasContainer) {
+        this.logger.logInfo('Class list container found');
+        return true;
+      }
+
+      this.logger.logInfo('No class list found');
+      return false;
+
+    } catch (error) {
+      this.logger.logError(error as Error, { context: 'WebAutomationEngine.verifyClassListLoaded' });
+      return false;
+    }
+  }
+
+  private async verifyCorrectDay(expectedDay: 'today' | 'tomorrow'): Promise<void> {
+    if (!this.page) return;
+
+    try {
+      // Verificar que estamos en el día correcto buscando indicadores visuales
+      const currentDate = new Date();
+      const targetDate = expectedDay === 'today' ? currentDate : new Date(currentDate.getTime() + 24 * 60 * 60 * 1000);
+      
+      // Buscar indicadores de fecha en la página
+      const dayIndicators = await this.page.locator('text=/\\d{1,2}/', { hasText: targetDate.getDate().toString() }).count();
+      
+      if (dayIndicators === 0) {
+        this.logger.logInfo(`Warning: Could not verify we're on the correct day (${expectedDay})`);
+      } else {
+        this.logger.logInfo(`Verified we're on the correct day: ${expectedDay}`);
+      }
+    } catch (error) {
+      this.logger.logError(error as Error, { context: 'WebAutomationEngine.verifyCorrectDay' });
+      // No lanzar error, esto es solo verificación
+    }
+  }
+
+  async verifyCorrectDaySelected(expectedDay: 'today' | 'tomorrow'): Promise<boolean> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo(`Verifying we're on the correct day: ${expectedDay}`);
+
+      // Obtener fecha objetivo
+      const currentDate = new Date();
+      const targetDate = expectedDay === 'today' ? currentDate : new Date(currentDate.getTime() + 24 * 60 * 60 * 1000);
+      
+      // Buscar múltiples indicadores de fecha
+      const dayNumber = targetDate.getDate().toString();
+      const dayName = targetDate.toLocaleDateString('es-ES', { weekday: 'short' }).toLowerCase();
+      
+      // Verificar número del día
+      const dayNumberFound = await this.page.locator(`text=${dayNumber}`).count() > 0;
+      
+      // Verificar nombre del día (ej: "lun", "mar", etc.)
+      const dayNameFound = await this.page.locator(`text=${dayName}`).count() > 0;
+      
+      // Verificar botones activos (con timeout corto para evitar bloqueos)
+      let todayButtonActive: string | null = null;
+      let tomorrowButtonActive: string | null = null;
+      
+      try {
+        todayButtonActive = await this.page.locator(SELECTORS.navigation.todayButton).getAttribute('class', { timeout: 2000 });
+      } catch {
+        // Ignorar si no se encuentra
+      }
+      
+      try {
+        tomorrowButtonActive = await this.page.locator(SELECTORS.navigation.tomorrowButton).getAttribute('class', { timeout: 2000 });
+      } catch {
+        // Ignorar si no se encuentra
+      }
+      
+      const isCorrectDay = dayNumberFound || dayNameFound || 
+        (expectedDay === 'today' && todayButtonActive?.includes('active')) ||
+        (expectedDay === 'tomorrow' && tomorrowButtonActive?.includes('active'));
+
+      if (isCorrectDay) {
+        this.logger.logInfo(`Successfully verified we're on ${expectedDay}`);
+        return true;
+      } else {
+        this.logger.logInfo(`Could not verify we're on ${expectedDay}, but continuing`);
+        return false;
+      }
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.verifyCorrectDaySelected',
+        expectedDay 
+      });
+      return false;
+    }
+  }
+
+  async checkClassStatus(className: string): Promise<'available' | 'full' | 'already_booked' | 'not_found'> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo(`Checking status for class: ${className}`);
+
+      // Buscar la clase por su nombre
+      const classElement = this.page.locator(SELECTORS.classes.classHeading(className)).first();
+      
+      if (!(await classElement.isVisible({ timeout: 5000 }))) {
+        this.logger.logInfo(`Class not found: ${className}`);
+        return 'not_found';
+      }
+
+      // Buscar el contenedor padre de la clase para verificar su estado
+      const classContainer = classElement.locator('..').first();
+
+      // Verificar si ya está agendada
+      if (await classContainer.locator(SELECTORS.classes.alreadyBooked).isVisible({ timeout: 1000 })) {
+        this.logger.logInfo(`Class ${className} is already booked`);
+        return 'already_booked';
+      }
+
+      // Verificar si está llena
+      if (await classContainer.locator(SELECTORS.classes.fullCapacity).isVisible({ timeout: 1000 })) {
+        this.logger.logInfo(`Class ${className} is at full capacity`);
+        return 'full';
+      }
+
+      // Verificar si tiene espacios disponibles
+      if (await classContainer.locator(SELECTORS.classes.availableSpaces).isVisible({ timeout: 1000 })) {
+        this.logger.logInfo(`Class ${className} has available spaces`);
+        return 'available';
+      }
+
+      // Si no encontramos indicadores específicos, asumir que está disponible
+      this.logger.logInfo(`Class ${className} status unclear, assuming available`);
+      return 'available';
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.checkClassStatus',
+        className 
+      });
+      return 'not_found';
+    }
+  }
+
+  async verifyClassExists(className: string): Promise<boolean> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo(`Verifying class exists: ${className}`);
+
+      // Buscar la clase por su nombre con múltiples selectores
+      const classSelectors = [
+        SELECTORS.classes.classHeading(className),
+        `text="${className}"`,
+        `[data-class-name="${className}"]`,
+        `*:has-text("${className}")`
+      ];
+
+      for (const selector of classSelectors) {
+        try {
+          const element = this.page.locator(selector).first();
+          if (await element.isVisible({ timeout: 2000 })) {
+            this.logger.logInfo(`Class ${className} found with selector: ${selector}`);
+            return true;
+          }
+        } catch {
+          // Continuar con el siguiente selector
+        }
+      }
+
+      this.logger.logInfo(`Class ${className} not found with any selector`);
+      return false;
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.verifyClassExists',
+        className 
+      });
+      return false;
+    }
+  }
+
+  async getParticipantInfo(className: string): Promise<{ current: number; max: number } | null> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo(`Getting participant info for class: ${className}`);
+
+      // Buscar la clase
+      const classElement = this.page.locator(SELECTORS.classes.classHeading(className)).first();
+      
+      if (!(await classElement.isVisible({ timeout: 3000 }))) {
+        this.logger.logInfo(`Class ${className} not found for participant info`);
+        return null;
+      }
+
+      // Buscar información de participantes en el contenedor de la clase
+      const classContainer = classElement.locator('..').first();
+      
+      // Buscar patrones comunes de información de participantes
+      const participantPatterns = [
+        /(\d+)\/(\d+)/,  // "5/15" format
+        /(\d+)\s*de\s*(\d+)/,  // "5 de 15" format
+        /Participantes:\s*(\d+)\/(\d+)/,  // "Participantes: 5/15"
+        /(\d+)\s*participantes\s*de\s*(\d+)/  // "5 participantes de 15"
+      ];
+
+      const containerText = await classContainer.textContent() || '';
+      
+      for (const pattern of participantPatterns) {
+        const match = containerText.match(pattern);
+        if (match) {
+          const current = parseInt(match[1]);
+          const max = parseInt(match[2]);
+          
+          this.logger.logInfo(`Found participant info for ${className}: ${current}/${max}`);
+          return { current, max };
+        }
+      }
+
+      // Buscar elementos específicos de participantes
+      try {
+        const participantElement = await classContainer.locator(SELECTORS.modal.participantInfo).first();
+        if (await participantElement.isVisible({ timeout: 1000 })) {
+          const participantText = await participantElement.textContent() || '';
+          const match = participantText.match(/(\d+)\/(\d+)/);
+          if (match) {
+            const current = parseInt(match[1]);
+            const max = parseInt(match[2]);
+            
+            this.logger.logInfo(`Found participant info in element for ${className}: ${current}/${max}`);
+            return { current, max };
+          }
+        }
+      } catch {
+        // Ignorar si no se encuentra el elemento específico
+      }
+
+      this.logger.logInfo(`No participant info found for class: ${className}`);
+      return null;
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.getParticipantInfo',
+        className 
+      });
+      return null;
+    }
+  }
+
+  async getAvailableSpaces(className: string): Promise<number | null> {
+    const participantInfo = await this.getParticipantInfo(className);
+    
+    if (participantInfo) {
+      const available = participantInfo.max - participantInfo.current;
+      this.logger.logInfo(`Available spaces for ${className}: ${available}`);
+      return available;
+    }
+
+    return null;
+  }
+
+  /**
+   * Complete preparation phase for critical timing execution
+   * Requirements 6.1, 6.2: Complete all setup before critical moment
+   */
+  async prepareReservation(
+    email: string, 
+    password: string, 
+    dayToSelect: 'today' | 'tomorrow', 
+    className: string
+  ): Promise<void> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo('Starting reservation preparation phase', { className, dayToSelect });
+
+      // Step 1: Complete login process
+      const loginSuccess = await this.login(email, password);
+      if (!loginSuccess) {
+        throw new Error('Login failed during preparation phase');
+      }
+
+      // Step 2: Select target day (always "tomorrow" for 25h rule)
+      await this.selectDay(dayToSelect);
+
+      // Step 3: Verify class exists and check status
+      const classExists = await this.verifyClassExists(className);
+      if (!classExists) {
+        throw new Error(`Target class "${className}" not found on selected day`);
+      }
+
+      const classStatus = await this.checkClassStatus(className);
+      if (classStatus === 'already_booked') {
+        this.logger.logInfo(`Class ${className} is already booked - no action needed`);
+        return;
+      }
+
+      if (classStatus === 'full') {
+        throw new Error(`Class "${className}" is already at full capacity`);
+      }
+
+      // Step 4: Position browser for critical timing execution
+      await this.waitUntilReady();
+
+      // Step 5: Final verification that everything is ready
+      await this.verifyReadyForCriticalExecution(className);
+
+      this.logger.logInfo('Reservation preparation completed successfully', { 
+        className, 
+        dayToSelect,
+        classStatus 
+      });
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.prepareReservation',
+        className,
+        dayToSelect
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Verify all elements are ready for critical timing execution
+   * Requirements 6.2: Ensure browser is positioned correctly
+   */
+  private async verifyReadyForCriticalExecution(className: string): Promise<void> {
+    if (!this.page) {
+      throw new Error('Page not available');
+    }
+
+    try {
+      this.logger.logInfo('Verifying readiness for critical execution', { className });
+
+      // Verify class is visible and clickable
+      const classElement = this.page.locator(SELECTORS.classes.classHeading(className)).first();
+      
+      if (!(await classElement.isVisible({ timeout: 5000 }))) {
+        throw new Error(`Class "${className}" is not visible for critical execution`);
+      }
+
+      // Verify class is not disabled or in an unclickable state
+      const isEnabled = await classElement.isEnabled({ timeout: 2000 });
+      if (!isEnabled) {
+        throw new Error(`Class "${className}" is not clickable for critical execution`);
+      }
+
+      // Verify page is stable (no ongoing loading)
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 });
+
+      // Pre-locate elements for faster execution
+      await this.prelocateElementsForExecution(className);
+
+      this.logger.logInfo('Critical execution readiness verified', { className });
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.verifyReadyForCriticalExecution',
+        className 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Pre-locate elements to optimize critical timing execution
+   * Requirements 6.3: Optimize for maximum speed
+   */
+  private async prelocateElementsForExecution(className: string): Promise<void> {
+    if (!this.page) return;
+
+    try {
+      // Pre-locate class element
+      const classElement = this.page.locator(SELECTORS.classes.classHeading(className)).first();
+      await classElement.waitFor({ timeout: 3000 });
+
+      // Verify modal elements will be available (without clicking yet)
+      // This helps ensure the modal system is ready
+      // const modalContainer = this.page.locator('[role="dialog"], .modal, [data-testid="modal"]').first();
+      
+      this.logger.logInfo('Elements pre-located for critical execution', { className });
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.prelocateElementsForExecution',
+        className 
+      });
+      // Don't throw here - this is optimization, not critical
+    }
+  }
+
+  async waitUntilReady(): Promise<void> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    try {
+      this.logger.logInfo('Waiting until browser is ready for critical timing execution');
+
+      // Verificar que la página está completamente cargada
+      await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+
+      // Verificar que la lista de clases está visible
+      await this.waitForClassListToLoad();
+
+      this.logger.logInfo('Browser is ready for critical timing execution');
+    } catch (error) {
+      this.logger.logError(error as Error, { context: 'WebAutomationEngine.waitUntilReady' });
+      throw error;
+    }
+  }
+
+  /**
+   * Execute critical timing reservation sequence
+   * Requirements 3.5, 6.3: Execute at exact moment with maximum speed
+   */
+  async executeReservation(className: string): Promise<ReservationResult> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    const startTime = new Date();
+    
+    try {
+      this.logger.logInfo(`Executing critical timing reservation for class: ${className}`);
+
+      // CRITICAL SEQUENCE - Optimized for maximum speed
+      // Pre-locate elements for faster execution
+      const classElement = this.page.locator(SELECTORS.classes.classHeading(className)).first();
+      
+      // Verify class element exists before attempting critical sequence
+      if (!(await classElement.isVisible({ timeout: 1000 }))) {
+        throw new Error(`Class "${className}" not found for reservation execution`);
+      }
+
+      // Action 1: Click class heading to open modal
+      const classClickStart = new Date();
+      await classElement.click();
+      const classClickEnd = new Date();
+      
+      this.logger.logInfo(`Class clicked in ${classClickEnd.getTime() - classClickStart.getTime()}ms`, { className });
+
+      // Action 2: Wait for modal and click reserve button with optimized timing
+      const reserveButtonStart = new Date();
+      
+      try {
+        // Wait for reserve button with shorter timeout for speed
+        const reserveButton = this.page.locator(SELECTORS.modal.reserveButton).first();
+        await reserveButton.waitFor({ timeout: 2000 });
+        
+        // Click immediately when found
+        await reserveButton.click();
+        
+        const reserveButtonEnd = new Date();
+        this.logger.logInfo(`Reserve button clicked in ${reserveButtonEnd.getTime() - reserveButtonStart.getTime()}ms`, { className });
+        
+      } catch (modalError) {
+        // If modal doesn't open, try alternative approach
+        this.logger.logInfo(`Modal not opened, attempting alternative reservation method`, { className });
+        
+        // Try direct reservation without modal (some classes might work differently)
+        const alternativeReserveSelectors = [
+          'button:has-text("Reservar")',
+          'button:has-text("Inscribirse")',
+          '[data-action="reserve"]',
+          '.reserve-button'
+        ];
+        
+        let alternativeSuccess = false;
+        for (const selector of alternativeReserveSelectors) {
+          try {
+            const altButton = this.page.locator(selector).first();
+            if (await altButton.isVisible({ timeout: 500 })) {
+              await altButton.click();
+              alternativeSuccess = true;
+              this.logger.logInfo(`Alternative reservation method succeeded with selector: ${selector}`, { className });
+              break;
+            }
+          } catch {
+            // Continue to next selector
+          }
+        }
+        
+        if (!alternativeSuccess) {
+          throw new Error(`Modal did not open and no alternative reservation method found: ${(modalError as Error).message}`);
+        }
+      }
+
+      const executionEndTime = new Date();
+      const executionDuration = executionEndTime.getTime() - startTime.getTime();
+
+      this.logger.logInfo(`Critical sequence completed in ${executionDuration}ms`, { className });
+
+      // Action 3: Verify reservation result (with shorter timeout for speed)
+      const result = await this.verifyReservationSuccess(className);
+      
+      const finalEndTime = new Date();
+      const totalTimingAccuracy = finalEndTime.getTime() - startTime.getTime();
+
+      this.logger.logInfo(`Reservation execution completed`, { 
+        className, 
+        success: result.success,
+        executionDuration,
+        totalTimingAccuracy
+      });
+
+      return {
+        ...result,
+        timestamp: startTime,
+        timingAccuracy: totalTimingAccuracy
+      };
+
+    } catch (error) {
+      const endTime = new Date();
+      const timingAccuracy = endTime.getTime() - startTime.getTime();
+
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.executeReservation',
+        className,
+        timingAccuracy
+      });
+
+      return {
+        success: false,
+        message: `Reservation failed: ${(error as Error).message}`,
+        timestamp: startTime,
+        timingAccuracy,
+        hasSpots: false,
+        classStatus: 'available'
+      };
+    }
+  }
+
+  /**
+   * Execute ultra-fast reservation using JavaScript evaluation for maximum speed
+   * Requirements 6.3: Optimize for millisecond-level timing accuracy
+   */
+  async executeReservationUltraFast(className: string): Promise<ReservationResult> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    const startTime = new Date();
+    
+    try {
+      this.logger.logInfo(`Executing ultra-fast reservation for class: ${className}`);
+
+      // Use JavaScript evaluation for maximum speed (bypasses Playwright's safety checks)
+      const executionResult = await this.page.evaluate((className) => {
+        const startTime = Date.now();
+        
+        // Find class element
+        const classSelectors = [
+          `h3:has-text("${className}")`,
+          `h4:has-text("${className}")`,
+          `[role="heading"]:has-text("${className}")`,
+          `*:contains("${className}")`
+        ];
+        
+        let classElement: Element | null = null;
+        for (const selector of classSelectors) {
+          try {
+            classElement = document.querySelector(selector);
+            if (classElement) break;
+          } catch {
+            // Continue to next selector
+          }
+        }
+        
+        if (!classElement) {
+          return {
+            success: false,
+            message: `Class "${className}" not found`,
+            duration: Date.now() - startTime
+          };
+        }
+        
+        // Click class element
+        (classElement as HTMLElement).click();
+        
+        // Wait briefly for modal to appear
+        const modalWaitStart = Date.now();
+        let reserveButton: Element | null = null;
+        
+        // Polling for reserve button with timeout
+        const maxWait = 2000; // 2 seconds max
+        while (Date.now() - modalWaitStart < maxWait) {
+          reserveButton = document.querySelector('button:has-text("Agendar")') ||
+                          document.querySelector('button:contains("Agendar")') ||
+                          document.querySelector('[data-action="reserve"]');
+          
+          if (reserveButton) {
+            (reserveButton as HTMLElement).click();
+            return {
+              success: true,
+              message: `Ultra-fast reservation executed for ${className}`,
+              duration: Date.now() - startTime
+            };
+          }
+          
+          // Small delay to prevent excessive CPU usage
+          const now = Date.now();
+          while (Date.now() - now < 10) {
+            // Busy wait for 10ms
+          }
+        }
+        
+        return {
+          success: false,
+          message: `Reserve button not found within timeout for ${className}`,
+          duration: Date.now() - startTime
+        };
+        
+      }, className);
+
+      const executionEndTime = new Date();
+      const executionDuration = executionEndTime.getTime() - startTime.getTime();
+
+      this.logger.logInfo(`Ultra-fast execution completed in ${executionDuration}ms`, { 
+        className,
+        jsExecutionDuration: executionResult.duration
+      });
+
+      if (executionResult.success) {
+        // Verify the result
+        const verificationResult = await this.verifyReservationSuccess(className);
+        
+        return {
+          ...verificationResult,
+          timestamp: startTime,
+          timingAccuracy: executionDuration
+        };
+      } else {
+        return {
+          success: false,
+          message: executionResult.message,
+          timestamp: startTime,
+          timingAccuracy: executionDuration,
+          hasSpots: false,
+          classStatus: 'available'
+        };
+      }
+
+    } catch (error) {
+      const endTime = new Date();
+      const timingAccuracy = endTime.getTime() - startTime.getTime();
+
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.executeReservationUltraFast',
+        className,
+        timingAccuracy
+      });
+
+      return {
+        success: false,
+        message: `Ultra-fast reservation failed: ${(error as Error).message}`,
+        timestamp: startTime,
+        timingAccuracy,
+        hasSpots: false,
+        classStatus: 'available'
+      };
+    }
+  }
+
+  /**
+   * Verify reservation success with comprehensive result detection
+   * Requirements 3.6: Detect reservation success/failure states
+   */
+  async verifyReservationSuccess(className: string): Promise<ReservationResult> {
+    if (!this.page) {
+      throw new Error('WebAutomationEngine not initialized. Call initialize() first.');
+    }
+
+    const timestamp = new Date();
+
+    try {
+      this.logger.logInfo(`Verifying reservation result for class: ${className}`);
+
+      // Wait for UI to update after reservation attempt
+      await this.page.waitForTimeout(1500);
+
+      // Check for success indicators first (most important)
+      const isBooked = await this.page.locator(SELECTORS.classes.alreadyBooked).isVisible({ timeout: 3000 });
+      
+      if (isBooked) {
+        this.logger.logInfo(`Reservation successful - class ${className} is now booked`);
+        
+        const participantInfo = await this.getParticipantInfo(className);
+        
+        return {
+          success: true,
+          message: `Successfully reserved ${className}`,
+          timestamp,
+          timingAccuracy: 0, // Will be set by caller
+          hasSpots: true,
+          participantCount: participantInfo ? `${participantInfo.current}/${participantInfo.max}` : undefined,
+          classStatus: 'already_booked'
+        };
+      }
+
+      // Check for "Agendando..." state (reservation in progress)
+      const isReserving = await this.page.locator(SELECTORS.modal.reservingButton).isVisible({ timeout: 1000 });
+      
+      if (isReserving) {
+        this.logger.logInfo(`Reservation in progress for ${className}, waiting for completion`);
+        
+        // Wait a bit more for the reservation to complete
+        await this.page.waitForTimeout(2000);
+        
+        // Check again for success
+        const finalCheck = await this.page.locator(SELECTORS.classes.alreadyBooked).isVisible({ timeout: 2000 });
+        
+        if (finalCheck) {
+          const participantInfo = await this.getParticipantInfo(className);
+          
+          return {
+            success: true,
+            message: `Successfully reserved ${className} (after processing delay)`,
+            timestamp,
+            timingAccuracy: 0,
+            hasSpots: true,
+            participantCount: participantInfo ? `${participantInfo.current}/${participantInfo.max}` : undefined,
+            classStatus: 'already_booked'
+          };
+        }
+      }
+
+      // Check for failure indicators
+      const isFull = await this.page.locator(SELECTORS.classes.fullCapacity).isVisible({ timeout: 1000 });
+      
+      if (isFull) {
+        this.logger.logInfo(`Reservation failed - class ${className} is at full capacity`);
+        
+        return {
+          success: false,
+          message: `Class ${className} is at full capacity`,
+          timestamp,
+          timingAccuracy: 0,
+          hasSpots: false,
+          classStatus: 'full'
+        };
+      }
+
+      // Check if class still shows as available (reservation might have failed silently)
+      const hasAvailableSpaces = await this.page.locator(SELECTORS.classes.availableSpaces).isVisible({ timeout: 1000 });
+      
+      if (hasAvailableSpaces) {
+        const participantInfo = await this.getParticipantInfo(className);
+        
+        return {
+          success: false,
+          message: `Reservation attempt failed - class ${className} still shows as available`,
+          timestamp,
+          timingAccuracy: 0,
+          hasSpots: true,
+          participantCount: participantInfo ? `${participantInfo.current}/${participantInfo.max}` : undefined,
+          classStatus: 'available'
+        };
+      }
+
+      // If no clear indicators found, check for error messages
+      const errorMessages = await this.detectErrorMessages();
+      
+      if (errorMessages.length > 0) {
+        return {
+          success: false,
+          message: `Reservation failed: ${errorMessages.join(', ')}`,
+          timestamp,
+          timingAccuracy: 0,
+          hasSpots: false,
+          classStatus: 'available'
+        };
+      }
+
+      // Default case - unclear result
+      this.logger.logInfo(`Reservation result unclear for ${className}`);
+      
+      return {
+        success: false,
+        message: `Reservation result unclear for ${className} - no definitive success or failure indicators found`,
+        timestamp,
+        timingAccuracy: 0,
+        hasSpots: false,
+        classStatus: 'available'
+      };
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.verifyReservationSuccess',
+        className 
+      });
+
+      return {
+        success: false,
+        message: `Failed to verify reservation result: ${(error as Error).message}`,
+        timestamp,
+        timingAccuracy: 0,
+        hasSpots: false,
+        classStatus: 'available'
+      };
+    }
+  }
+
+  /**
+   * Detect error messages on the page
+   * Requirements 3.6: Handle different types of failure
+   */
+  private async detectErrorMessages(): Promise<string[]> {
+    if (!this.page) return [];
+
+    const errorMessages: string[] = [];
+
+    try {
+      // Common error message patterns in Spanish and English
+      const errorSelectors = [
+        'text=Error',
+        'text=No se pudo',
+        'text=Falló',
+        'text=Sin conexión',
+        'text=Tiempo agotado',
+        'text=Network error',
+        'text=Connection failed',
+        'text=Server error',
+        'text=No disponible',
+        'text=Unavailable',
+        'text=Sesión expirada',
+        'text=Session expired',
+        '[role="alert"]',
+        '.error-message',
+        '.alert-error',
+        '.error',
+        '.alert-danger',
+        '[data-testid="error"]'
+      ];
+
+      for (const selector of errorSelectors) {
+        try {
+          const element = this.page.locator(selector).first();
+          if (await element.isVisible({ timeout: 500 })) {
+            const text = await element.textContent();
+            if (text) {
+              errorMessages.push(text.trim());
+            }
+          }
+        } catch {
+          // Continue checking other selectors
+        }
+      }
+
+    } catch (error) {
+      this.logger.logError(error as Error, { context: 'WebAutomationEngine.detectErrorMessages' });
+    }
+
+    return errorMessages;
+  }
+
+  /**
+   * Detect changes in participant count after reservation attempt
+   * Requirements 3.6: Detect changes in counter of participants
+   */
+  async detectParticipantCountChange(className: string, previousCount?: { current: number; max: number }): Promise<{
+    changed: boolean;
+    previousCount?: { current: number; max: number };
+    newCount?: { current: number; max: number };
+    increased: boolean;
+  }> {
+    try {
+      this.logger.logInfo(`Detecting participant count change for class: ${className}`);
+
+      const currentCount = await this.getParticipantInfo(className);
+      
+      if (!previousCount || !currentCount) {
+        return {
+          changed: false,
+          previousCount,
+          newCount: currentCount || undefined,
+          increased: false
+        };
+      }
+
+      const changed = previousCount.current !== currentCount.current;
+      const increased = currentCount.current > previousCount.current;
+
+      if (changed) {
+        this.logger.logInfo(`Participant count changed for ${className}`, {
+          previous: `${previousCount.current}/${previousCount.max}`,
+          current: `${currentCount.current}/${currentCount.max}`,
+          increased
+        });
+      }
+
+      return {
+        changed,
+        previousCount,
+        newCount: currentCount,
+        increased
+      };
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.detectParticipantCountChange',
+        className 
+      });
+
+      return {
+        changed: false,
+        previousCount,
+        increased: false
+      };
+    }
+  }
+
+  /**
+   * Enhanced verification with multiple failure type detection
+   * Requirements 3.6: Handle different types of failure (network, capacity, etc.)
+   */
+  async verifyReservationWithFailureTypes(className: string): Promise<ReservationResult & {
+    failureType?: 'network_error' | 'capacity_full' | 'already_booked' | 'session_expired' | 'class_not_found' | 'unknown';
+    participantCountChange?: {
+      changed: boolean;
+      previousCount?: { current: number; max: number };
+      newCount?: { current: number; max: number };
+      increased: boolean;
+    };
+  }> {
+    const timestamp = new Date();
+
+    try {
+      this.logger.logInfo(`Enhanced verification for class: ${className}`);
+
+      // Get initial participant count for comparison
+      const initialCount = await this.getParticipantInfo(className);
+
+      // Wait for UI to update
+      await this.page!.waitForTimeout(1500);
+
+      // Check for success first
+      const isBooked = await this.page!.locator(SELECTORS.classes.alreadyBooked).isVisible({ timeout: 3000 });
+      
+      if (isBooked) {
+        const participantCountChange = await this.detectParticipantCountChange(className, initialCount || undefined);
+        
+        return {
+          success: true,
+          message: `Successfully reserved ${className}`,
+          timestamp,
+          timingAccuracy: 0,
+          hasSpots: true,
+          participantCount: participantCountChange.newCount ? 
+            `${participantCountChange.newCount.current}/${participantCountChange.newCount.max}` : undefined,
+          classStatus: 'already_booked',
+          participantCountChange
+        };
+      }
+
+      // Check for specific failure types
+      
+      // 1. Network/Connection errors
+      const networkErrors = await this.detectErrorMessages();
+      if (networkErrors.length > 0) {
+        return {
+          success: false,
+          message: `Network error: ${networkErrors.join(', ')}`,
+          timestamp,
+          timingAccuracy: 0,
+          hasSpots: false,
+          classStatus: 'available',
+          failureType: 'network_error'
+        };
+      }
+
+      // 2. Capacity full
+      const isFull = await this.page!.locator(SELECTORS.classes.fullCapacity).isVisible({ timeout: 1000 });
+      if (isFull) {
+        return {
+          success: false,
+          message: `Class ${className} is at full capacity`,
+          timestamp,
+          timingAccuracy: 0,
+          hasSpots: false,
+          classStatus: 'full',
+          failureType: 'capacity_full'
+        };
+      }
+
+      // 3. Session expired
+      const sessionExpiredIndicators = [
+        'text=Sesión expirada',
+        'text=Session expired',
+        'text=Inicia sesión',
+        'text=Login required',
+        'input[name="email"]' // Login form appeared
+      ];
+
+      for (const indicator of sessionExpiredIndicators) {
+        if (await this.page!.locator(indicator).isVisible({ timeout: 500 })) {
+          return {
+            success: false,
+            message: `Session expired during reservation for ${className}`,
+            timestamp,
+            timingAccuracy: 0,
+            hasSpots: false,
+            classStatus: 'available',
+            failureType: 'session_expired'
+          };
+        }
+      }
+
+      // 4. Class not found (might have been removed or changed)
+      const classExists = await this.verifyClassExists(className);
+      if (!classExists) {
+        return {
+          success: false,
+          message: `Class ${className} not found after reservation attempt`,
+          timestamp,
+          timingAccuracy: 0,
+          hasSpots: false,
+          classStatus: 'available',
+          failureType: 'class_not_found'
+        };
+      }
+
+      // 5. Check if still available (silent failure)
+      const hasAvailableSpaces = await this.page!.locator(SELECTORS.classes.availableSpaces).isVisible({ timeout: 1000 });
+      
+      if (hasAvailableSpaces) {
+        const participantCountChange = await this.detectParticipantCountChange(className, initialCount || undefined);
+        
+        return {
+          success: false,
+          message: `Reservation attempt failed silently - class ${className} still shows as available`,
+          timestamp,
+          timingAccuracy: 0,
+          hasSpots: true,
+          participantCount: participantCountChange.newCount ? 
+            `${participantCountChange.newCount.current}/${participantCountChange.newCount.max}` : undefined,
+          classStatus: 'available',
+          failureType: 'unknown',
+          participantCountChange
+        };
+      }
+
+      // Default unknown failure
+      return {
+        success: false,
+        message: `Reservation result unclear for ${className} - no definitive indicators found`,
+        timestamp,
+        timingAccuracy: 0,
+        hasSpots: false,
+        classStatus: 'available',
+        failureType: 'unknown'
+      };
+
+    } catch (error) {
+      this.logger.logError(error as Error, { 
+        context: 'WebAutomationEngine.verifyReservationWithFailureTypes',
+        className 
+      });
+
+      return {
+        success: false,
+        message: `Failed to verify reservation result: ${(error as Error).message}`,
+        timestamp,
+        timingAccuracy: 0,
+        hasSpots: false,
+        classStatus: 'available',
+        failureType: 'unknown'
+      };
+    }
+  }
+
+
+
+  async cleanup(): Promise<void> {
+    try {
+      this.logger.logInfo('Cleaning up WebAutomationEngine resources');
+
+      if (this.page) {
+        await this.page.close();
+        this.page = null;
+      }
+
+      if (this.context) {
+        await this.context.close();
+        this.context = null;
+      }
+
+      if (this.browser) {
+        await this.browser.close();
+        this.browser = null;
+      }
+
+      this.isInitialized = false;
+      this.logger.logInfo('WebAutomationEngine cleanup completed');
+    } catch (error) {
+      this.logger.logError(error as Error, { context: 'WebAutomationEngine.cleanup' });
+    }
+  }
+}

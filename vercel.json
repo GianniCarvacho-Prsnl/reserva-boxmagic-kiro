@@ -1,0 +1,64 @@
+{
+  "version": 2,
+  "functions": {
+    "api/reserve.ts": {
+      "maxDuration": 60,
+      "memory": 1024,
+      "runtime": "@vercel/node@18"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/reserve?scheduleId=metcon-viernes-18",
+      "schedule": "0 17 * * 4"
+    },
+    {
+      "path": "/api/reserve?scheduleId=crossfit-lunes-18",
+      "schedule": "0 17 * * 0"
+    },
+    {
+      "path": "/api/reserve?scheduleId=crossfit-martes-19",
+      "schedule": "0 18 * * 1"
+    },
+    {
+      "path": "/api/reserve?scheduleId=crossfit-miercoles-18",
+      "schedule": "0 17 * * 2"
+    },
+    {
+      "path": "/api/reserve?scheduleId=crossfit-jueves-19",
+      "schedule": "0 18 * * 3"
+    },
+    {
+      "path": "/api/reserve?scheduleId=crossfit-sabado-10",
+      "schedule": "0 9 * * 5"
+    }
+  ],
+  "env": {
+    "BOXMAGIC_EMAIL": "@boxmagic_email",
+    "BOXMAGIC_PASSWORD": "@boxmagic_password",
+    "TIMEZONE": "America/Santiago",
+    "WEBHOOK_URL": "@webhook_url",
+    "BROWSER_HEADLESS": "true",
+    "NOTIFICATIONS_ENABLED": "true"
+  },
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  },
+  "regions": ["scl1"],
+  "rewrites": [
+    {
+      "source": "/health",
+      "destination": "/api/reserve?status=true"
+    },
+    {
+      "source": "/status",
+      "destination": "/api/reserve?status=true"
+    },
+    {
+      "source": "/validate",
+      "destination": "/api/reserve?validate=true"
+    }
+  ]
+}
