@@ -1,4 +1,4 @@
-import { Page, Browser } from 'playwright';
+import { Page } from 'playwright';
 import { Logger } from '../core/Logger';
 import { ErrorType } from '../types/ErrorTypes';
 import { RetryStrategyManager } from './RetryStrategy';
@@ -36,7 +36,6 @@ export interface LayoutChange {
 
 export class EdgeCaseHandler {
   private page: Page;
-  private browser: Browser;
   private logger: Logger;
   private retryManager: RetryStrategyManager;
   private config: EdgeCaseConfig;
@@ -164,12 +163,10 @@ export class EdgeCaseHandler {
 
   constructor(
     page: Page,
-    browser: Browser,
     logger: Logger,
     config?: Partial<EdgeCaseConfig>
   ) {
     this.page = page;
-    this.browser = browser;
     this.logger = logger;
     this.retryManager = new RetryStrategyManager(logger);
     

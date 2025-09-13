@@ -1,4 +1,4 @@
-import { ErrorType, ErrorCategory, RetryStrategy as RetryStrategyType, getErrorClassification } from '../types/ErrorTypes';
+import { ErrorType, RetryStrategy as RetryStrategyType, getErrorClassification } from '../types/ErrorTypes';
 import { Logger } from '../core/Logger';
 
 /**
@@ -208,8 +208,6 @@ export class RetryStrategyManager {
 
         try {
           const result = await operation();
-          const executionTime = Date.now();
-          const latency = executionTime - targetTime.getTime();
 
           return {
             success: true,

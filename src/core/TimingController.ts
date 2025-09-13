@@ -60,11 +60,15 @@ export class TimingController {
   getCurrentTime(): Date {
     // Use configured timezone for operations
     const now = new Date();
-    // Log timezone for debugging (this uses the timezone property)
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(`Current time in ${this.timezone}: ${now.toISOString()}`);
-    }
+    // Timezone is stored for future timezone-aware operations
     return now;
+  }
+
+  /**
+   * Get timezone configuration
+   */
+  getTimezone(): string {
+    return this.timezone;
   }
 
   /**

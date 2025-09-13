@@ -235,13 +235,24 @@ export class ConfigManager {
       errors.push({ field: `${prefix}.className`, message: 'Class name is required' });
     }
 
-    if (!schedule.reservationTime) {
-      errors.push({ field: `${prefix}.reservationTime`, message: 'Reservation time is required' });
-    } else if (!this.isValidISODateTime(schedule.reservationTime)) {
+    // Validar nuevo formato: reservationHour + reservationDay
+    if (!schedule.reservationHour) {
+      errors.push({ field: `${prefix}.reservationHour`, message: 'Reservation hour is required (format: HH:MM)' });
+    } else if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(schedule.reservationHour)) {
       errors.push({ 
-        field: `${prefix}.reservationTime`, 
-        message: 'Invalid ISO datetime format. Use format like "2024-09-19T17:00:00-03:00"',
-        value: schedule.reservationTime 
+        field: `${prefix}.reservationHour`, 
+        message: 'Invalid hour format. Use format like "18:00"',
+        value: schedule.reservationHour 
+      });
+    }
+
+    if (!schedule.reservationDay) {
+      errors.push({ field: `${prefix}.reservationDay`, message: 'Reservation day is required' });
+    } else if (!['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'any'].includes(schedule.reservationDay)) {
+      errors.push({ 
+        field: `${prefix}.reservationDay`, 
+        message: 'Reservation day must be one of: sunday, monday, tuesday, wednesday, thursday, friday, saturday, any',
+        value: schedule.reservationDay 
       });
     }
 

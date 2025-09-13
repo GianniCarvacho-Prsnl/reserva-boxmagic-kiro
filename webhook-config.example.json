@@ -2,7 +2,6 @@
   "webhookExamples": {
     "description": "Example webhook configurations for different services",
     "note": "Copy the appropriate configuration to your config.json or environment variables",
-    
     "slack": {
       "webhookUrl": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
       "description": "Slack webhook for team notifications",
@@ -29,7 +28,6 @@
         ]
       }
     },
-
     "discord": {
       "webhookUrl": "https://discord.com/api/webhooks/YOUR/DISCORD/WEBHOOK",
       "description": "Discord webhook for personal notifications",
@@ -55,7 +53,6 @@
         ]
       }
     },
-
     "teams": {
       "webhookUrl": "https://outlook.office.com/webhook/YOUR/TEAMS/WEBHOOK",
       "description": "Microsoft Teams webhook for work notifications",
@@ -83,14 +80,12 @@
         ]
       }
     },
-
     "zapier": {
       "webhookUrl": "https://hooks.zapier.com/hooks/catch/YOUR/ZAPIER/WEBHOOK",
       "description": "Zapier webhook for automation workflows",
       "format": "generic",
       "note": "Zapier receives the full payload and can trigger various actions"
     },
-
     "generic": {
       "webhookUrl": "https://your-custom-endpoint.com/webhook",
       "description": "Generic webhook for custom integrations",
@@ -118,7 +113,11 @@
           "totalLogs": 15,
           "errorCount": 0,
           "warningCount": 1,
-          "phases": ["preparation", "execution", "verification"],
+          "phases": [
+            "preparation",
+            "execution",
+            "verification"
+          ],
           "duration": 15075
         },
         "metadata": {
@@ -137,7 +136,6 @@
       }
     }
   },
-
   "environment_variables": {
     "description": "Environment variables for webhook configuration",
     "variables": {
@@ -145,7 +143,6 @@
       "NOTIFICATIONS_ENABLED": "true"
     }
   },
-
   "testing": {
     "description": "How to test your webhook configuration",
     "steps": [

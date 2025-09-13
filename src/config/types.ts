@@ -9,11 +9,14 @@ export interface ReservationSchedule {
   id: string;
   dayToSelect: 'today' | 'tomorrow';
   className: string;
-  reservationTime: string; // ISO datetime string
+  reservationHour: string; // HH:MM format
+  reservationDay: 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'any';
   bufferSeconds: number;
   enabled: boolean;
   cronExpression?: string;
   description?: string;
+  // Backward compatibility (optional)
+  reservationTime?: string; // ISO datetime string - deprecated
 }
 
 export interface NotificationConfig {

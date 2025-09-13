@@ -2,6 +2,7 @@ import { ConfigManager } from '../config/ConfigManager.js';
 import { WebAutomationEngine } from './WebAutomationEngine.js';
 import { TimingController } from './TimingController.js';
 import { Logger, ReservationPhase } from './Logger.js';
+import { calculateNextReservationTime } from '../utils/timing.js';
 import type { ReservationConfig, ReservationSchedule } from '../config/types.js';
 import type { ReservationResult, TimingMetrics } from '../types/ReservationTypes.js';
 
@@ -106,13 +107,16 @@ export class ReservationBot {
         bufferSeconds: schedule.bufferSeconds
       });
 
-      // Parse target time
-      const targetTime = new Date(schedule.reservationTime);
+      // Parse target time usando nuevo formato
+      const targetTime = schedule.reservationTime 
+        ? new Date(schedule.reservationTime) // Backward compatibility
+        : this.calculateReservationTime(schedule);
       const now = this.timingController.getCurrentTime();
 
       // Validate timing
       if (targetTime.getTime() <= now.getTime()) {
-        throw new Error(`Target reservation time ${schedule.reservationTime} has already passed`);
+        const timeStr = schedule.reservationTime || `${schedule.reservationDay} ${schedule.reservationHour}`;
+        throw new Error(`Target reservation time ${timeStr} has already passed`);
       }
 
       // Calculate preparation time
@@ -488,6 +492,20 @@ export class ReservationBot {
   async reset(): Promise<void> {
     await this.cleanup();
     await this.initialize();
+  }
+
+  /**
+   * Calculate reservation time from new format (reservationHour + reservationDay)
+   */
+  private calculateReservationTime(schedule: ReservationSchedule): Date {
+    if (!schedule.reservationHour || !schedule.reservationDay) {
+      throw new Error(`Schedule ${schedule.id} missing reservationHour or reservationDay`);
+    }
+    
+    const config = this.configManager.getCurrentConfig();
+    const timezone = config?.timezone || 'America/Santiago';
+    
+    return calculateNextReservationTime(schedule.reservationHour, schedule.reservationDay, timezone);
   }
 
   /**

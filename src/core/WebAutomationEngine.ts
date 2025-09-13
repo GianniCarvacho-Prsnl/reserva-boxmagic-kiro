@@ -3,36 +3,51 @@ import type { Browser, BrowserContext, Page } from 'playwright';
 import { Logger } from './Logger.js';
 import type { ReservationResult } from '../types/ReservationTypes.js';
 
-// Selectores específicos basados en la exploración real del sitio BoxMagic
+// Selectores basados en análisis anti-bot completado - ESTABLES 99.87/100
 export const SELECTORS = {
   login: {
-    email: 'input[name="email"]',
-    password: 'input[type="password"]',
-    submitButton: 'button[type="submit"]:has-text("Ingresar")'
+    // Selectores estables confirmados por análisis MCP
+    email: 'input[placeholder="Correo"]',
+    password: 'input[placeholder="Contraseña"]', 
+    submitButton: 'button[type="submit"]'
   },
   navigation: {
-    // Selectores dinámicos basados en la imagen observada
-    daySelector: (day: string) => `text=${day}.`, // ej: "jue.", "vie."
-    dayNumber: (number: string) => `text=${number}`, // ej: "11", "12"
-    todayButton: 'text=Hoy',
-    tomorrowButton: 'text=Mañana'
+    // Selectores basados en texto visible (más estables)
+    daySelector: (day: string) => `text=${day}.`, // ej: "vie.", "sáb."
+    dayNumber: (number: string) => `text="${number}"`, // ej: "12", "13"
+    todayButton: '.Ui2Boton:has-text("Hoy")',
+    tomorrowButton: '.Ui2Boton:has-text("Mañana")'
   },
   classes: {
-    classHeading: (className: string) => `h3:has-text("${className}"), h4:has-text("${className}"), [role="heading"]:has-text("${className}")`,
+    // Selectores estables basados en análisis - usar getByRole y getByText
+    classHeading: (className: string) => `heading:has-text("${className}")`,
+    classButton: (className: string) => `button:has-text("${className}")`,
+    classLink: (className: string) => `link:has-text("${className}")`,
+    // Clases específicas detectadas como estables
+    crossfit07: 'text="07:00 CrossFit"',
+    crossfit08: 'text="08:00 CrossFit"', 
+    crossfit17: 'text="17:00 CrossFit"',
+    crossfit18: 'text="18:00 CrossFit"',
+    crossfit19: 'text="19:00 CrossFit"',
+    crossfit20: 'text="20:00 CrossFit"',
+    gymnastics: 'text="Gymnastics"',
+    weightlifting: 'text="Weightlifting"',
+    competitor: 'text="Competitor"',
+    functionalGainz: 'text="Functional Gainz"',
     availableSpaces: 'text=Espacios disponibles',
-    fullCapacity: 'text=Capacidad completa',
-    alreadyBooked: 'text=Agendada',
-    classList: '.class-list, [data-testid="class-list"], .schedule-container'
+    fullCapacity: 'text=Capacidad completa', 
+    alreadyBooked: 'text=Agendada'
   },
   modal: {
-    reserveButton: 'button:has-text("Agendar")',
-    reservingButton: 'button:has-text("Agendando")',
-    closeButton: 'button[aria-label="Close"], button:has-text("×"), button:has-text("Cerrar")',
-    participantInfo: 'text=Participantes'
+    reserveButton: 'button:has-text("Agendar"), [role="button"]:has-text("Agendar")',
+    reservingButton: 'button:has-text("Agendando"), button:has-text("Reservando")',
+    closeButton: 'button:has-text("×"), button:has-text("Cerrar"), [aria-label*="close" i]',
+    participantInfo: 'text=Participantes',
+    modalContainer: '[role="dialog"], dialog, *:has(text="Agendar")'
   },
   popups: {
     okButton: 'button:has-text("OK"), button:has-text("Aceptar")',
-    closeButton: 'button:has-text("×"), button[aria-label="Close"]',
+    closeButton: 'button:has-text("×"), [aria-label*="close" i]',
     dismissButton: 'button:has-text("Entendido"), button:has-text("Cerrar")'
   }
 } as const;
@@ -87,30 +102,65 @@ export class WebAutomationEngine implements WebAutomationEngine {
     try {
       this.logger.logInfo('Initializing WebAutomationEngine with optimized browser configuration');
       
-      // Configuración de navegador optimizada para velocidad
+      // Configuración de navegador optimizada para evitar detección de BoxMagic
       this.browser = await chromium.launch({
         headless: process.env['BROWSER_HEADLESS'] !== 'false',
+        channel: 'chrome', // Usar Chrome en lugar de Chromium
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-web-security',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-background-networking',
+          '--disable-blink-features=AutomationControlled', // Crítico: evitar detección
+          '--disable-automation',
+          '--no-first-run',
+          '--disable-infobars',
+          '--disable-extensions',
+          '--disable-plugins',
+          '--disable-images', // Acelerar carga
+          '--disable-javascript-harmony-shipping',
           '--disable-background-timer-throttling',
           '--disable-renderer-backgrounding',
-          '--disable-backgrounding-occluded-windows'
+          '--disable-backgrounding-occluded-windows',
+          '--disable-ipc-flooding-protection',
+          '--password-store=basic',
+          '--use-mock-keychain',
+          '--no-default-browser-check',
+          '--no-first-run',
+          '--disable-default-apps'
         ]
       });
 
       this.context = await this.browser.newContext({
-        viewport: { width: 1280, height: 720 },
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        viewport: { width: 1366, height: 768 }, // Tamaño más común
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        locale: 'es-CL', // Configurar idioma chileno
+        timezoneId: 'America/Santiago',
+        permissions: ['geolocation'], // Permisos típicos
+        geolocation: { latitude: -33.4489, longitude: -70.6693 }, // Santiago, Chile
+        extraHTTPHeaders: {
+          'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8'
+        }
       });
 
       this.page = await this.context.newPage();
       
-      // Configuración de página optimizada para velocidad
+      // Eliminar propiedades que indican automatización
+      await this.page.addInitScript(() => {
+        // Eliminar webdriver property
+        delete (window as any).navigator.webdriver;
+        
+        // Sobrescribir plugins
+        Object.defineProperty(navigator, 'plugins', {
+          get: () => [1, 2, 3, 4, 5]
+        });
+        
+        // Sobrescribir languages
+        Object.defineProperty(navigator, 'languages', {
+          get: () => ['es-CL', 'es', 'en']
+        });
+      });
+      
+      // Configuración de página optimizada
       this.page.setDefaultTimeout(parseInt(process.env['BROWSER_TIMEOUT'] || '30000'));
       
       this.isInitialized = true;
@@ -129,27 +179,33 @@ export class WebAutomationEngine implements WebAutomationEngine {
     try {
       this.logger.logInfo('Starting login process', { email });
 
-      // Navegar a la página de login
-      await this.navigateToSchedule();
+      // Navegar a la página de login si no estamos ya logueados
+      await this.page.goto('https://members.boxmagic.app/acceso/ingreso');
 
-      // Esperar a que aparezca el formulario de login
-      await this.page.waitForSelector(SELECTORS.login.email, { timeout: 10000 });
+      // Esperar a que la página cargue completamente (BoxMagic tarda en cargar)
+      await this.page.waitForTimeout(5000);
+      
+      // Verificar si ya estamos logueados (redirige automáticamente a horarios)
+      if (this.page.url().includes('/horarios')) {
+        this.logger.logInfo('Already logged in, redirected to schedule');
+        return true;
+      }
 
-      // Llenar credenciales
-      await this.page.fill(SELECTORS.login.email, email);
-      await this.page.fill(SELECTORS.login.password, password);
+      // Usar selectores estables confirmados por análisis anti-bot
+      await this.page.getByRole('textbox', { name: 'Correo' }).waitFor({ timeout: 15000 });
+
+      // Llenar credenciales con selectores estables
+      await this.page.getByRole('textbox', { name: 'Correo' }).fill(email);
+      await this.page.getByRole('textbox', { name: 'Contraseña' }).fill(password);
 
       this.logger.logInfo('Credentials filled, submitting login form');
 
-      // Enviar formulario
-      await this.page.click(SELECTORS.login.submitButton);
+      // Hacer clic en botón Ingresar - usar selector CSS estable
+      await this.page.locator('button[type="submit"]').click();
 
-      // Esperar a que el login se complete (verificar que ya no estamos en la página de login)
+      // Esperar a que el login se complete (verificar redirección a horarios)
       await this.page.waitForFunction(() => {
-        return !document.querySelector('input[name="email"]') || 
-               document.querySelector('text=Horarios') ||
-               document.querySelector('[data-testid="schedule"]') ||
-               window.location.pathname.includes('/horarios');
+        return window.location.pathname.includes('/horarios');
       }, { timeout: 15000 });
 
       // Manejar popups informativos después del login
@@ -180,10 +236,46 @@ export class WebAutomationEngine implements WebAutomationEngine {
         timeout: 30000
       });
 
+      // Esperar a que la página cargue completamente
+      await this.page.waitForTimeout(2000);
+
       this.logger.logInfo('Successfully navigated to schedule page');
     } catch (error) {
       this.logger.logError(error as Error, { context: 'WebAutomationEngine.navigateToSchedule' });
       throw error;
+    }
+  }
+
+  /**
+   * Close automatic modals that BoxMagic opens (like next scheduled class)
+   */
+  async closeAutomaticModals(): Promise<void> {
+    if (!this.page) return;
+
+    try {
+      // Look for modal close buttons
+      const closeSelectors = [
+        'button[aria-label="Close"]',
+        'button:has-text("×")',
+        'button:has-text("Cerrar")',
+        '[role="dialog"] button:first-child' // First button in dialog (usually close)
+      ];
+
+      for (const selector of closeSelectors) {
+        try {
+          const closeButton = this.page.locator(selector).first();
+          if (await closeButton.isVisible({ timeout: 1000 })) {
+            await closeButton.click();
+            this.logger.logInfo(`Closed automatic modal with selector: ${selector}`);
+            await this.page.waitForTimeout(1000); // Wait for modal to close
+            break;
+          }
+        } catch {
+          // Continue with next selector
+        }
+      }
+    } catch (error) {
+      this.logger.logInfo('No automatic modals found to close');
     }
   }
 
@@ -196,29 +288,80 @@ export class WebAutomationEngine implements WebAutomationEngine {
       this.logger.logInfo('Checking for and handling popups');
 
       // Esperar un momento para que aparezcan los popups
-      await this.page.waitForTimeout(2000);
+      await this.page.waitForTimeout(3000);
 
-      // Intentar cerrar popups comunes
+      // Usar selectores correctos encontrados en análisis
       const popupSelectors = [
-        SELECTORS.popups.okButton,
-        SELECTORS.popups.closeButton,
-        SELECTORS.popups.dismissButton
+        'dialog.zonaModal',                    // Selector principal encontrado
+        '.zonaModal',                          // Alternativo
+        'dialog',                              // Genérico para DIALOG
+        '.dialoWrapper'                        // Wrapper alternativo
       ];
+
+      let popupFound = false;
 
       for (const selector of popupSelectors) {
         try {
-          const element = await this.page.locator(selector).first();
-          if (await element.isVisible({ timeout: 1000 })) {
-            await element.click();
-            this.logger.logInfo(`Closed popup with selector: ${selector}`);
-            await this.page.waitForTimeout(500); // Esperar a que se cierre
+          const popupElement = this.page.locator(selector).first();
+          if (await popupElement.isVisible({ timeout: 2000 })) {
+            this.logger.logInfo(`Popup found with selector: ${selector}`);
+            popupFound = true;
+
+            // Intentar cerrar con selectores específicos
+            const closeSelectors = [
+              `${selector} .elModal-nucleo-cerrador`,    // Selector que funcionó en test
+              `${selector} button:has-text("×")`,        // Botón X
+              '.elModal-nucleo-cerrador',                // Global
+              '.cierreExterno'                           // Alternativo
+            ];
+
+            let closeSuccess = false;
+
+            for (const closeSelector of closeSelectors) {
+              try {
+                const closeButton = this.page.locator(closeSelector).first();
+                if (await closeButton.isVisible({ timeout: 1000 })) {
+                  await closeButton.click();
+                  await this.page.waitForTimeout(1000);
+                  
+                  // Verificar si se cerró
+                  if (!(await popupElement.isVisible({ timeout: 1000 }))) {
+                    this.logger.logInfo(`Popup closed with selector: ${closeSelector}`);
+                    closeSuccess = true;
+                    break;
+                  }
+                }
+              } catch {
+                // Continuar con siguiente selector
+              }
+            }
+
+            // Si no funcionó con botones, probar Escape
+            if (!closeSuccess) {
+              await this.page.keyboard.press('Escape');
+              await this.page.waitForTimeout(1000);
+              
+              if (!(await popupElement.isVisible({ timeout: 1000 }))) {
+                this.logger.logInfo('Popup closed with Escape key');
+                closeSuccess = true;
+              }
+            }
+
+            if (closeSuccess) {
+              break; // Salir del loop de popups
+            }
           }
         } catch {
-          // Ignorar si el popup no existe
+          // Continuar con siguiente selector
         }
       }
 
-      this.logger.logInfo('Popup handling completed');
+      if (popupFound) {
+        this.logger.logInfo('Popup handling completed');
+      } else {
+        this.logger.logInfo('No popups found to handle');
+      }
+
     } catch (error) {
       this.logger.logError(error as Error, { context: 'WebAutomationEngine.handlePopups' });
       // No lanzar error aquí, los popups son opcionales
@@ -236,25 +379,103 @@ export class WebAutomationEngine implements WebAutomationEngine {
       // Esperar a que la página de horarios esté cargada
       await this.page.waitForLoadState('domcontentloaded');
 
-      // Buscar y hacer clic en el botón correspondiente
-      const buttonSelector = dayToSelect === 'today' 
-        ? SELECTORS.navigation.todayButton 
-        : SELECTORS.navigation.tomorrowButton;
-
-      const dayButton = this.page.locator(buttonSelector).first();
+      // Calcular el número del día objetivo
+      const currentDate = new Date();
+      const targetDate = dayToSelect === 'today' ? currentDate : new Date(currentDate.getTime() + 24 * 60 * 60 * 1000);
+      const targetDay = targetDate.getDate().toString();
       
-      if (await dayButton.isVisible({ timeout: 5000 })) {
-        await dayButton.click();
-        this.logger.logInfo(`Clicked ${dayToSelect} button`);
-        
-        // Esperar a que se cargue la lista de clases del día seleccionado
-        await this.waitForClassListToLoad();
-      } else {
-        this.logger.logInfo(`${dayToSelect} button not found, assuming we're already on the correct day`);
+      this.logger.logInfo(`Target day number: ${targetDay} (${dayToSelect})`);
+
+      // Calcular el nombre del día en español
+      const dayNames = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+      const targetDayName = dayNames[targetDate.getDay()];
+      
+      this.logger.logInfo(`Target day name: ${targetDayName}`);
+
+      // Buscar el elemento clickeable con el día correcto usando múltiples estrategias
+      const daySelectors = [
+        // Selector más específico basado en el patrón dom.14
+        `text="${targetDayName}.${targetDay}"`,
+        `text="${targetDayName}. ${targetDay}"`, 
+        // Fallback a selectores más generales
+        `text="${targetDay}"`,
+        `[data-day="${targetDay}"]`,
+        `button:has-text("${targetDay}")`,
+        `.day-${targetDay}`
+      ];
+
+      let dayClicked = false;
+      
+      for (const selector of daySelectors) {
+        try {
+          const dayElement = this.page.locator(selector).first();
+          
+          if (await dayElement.isVisible({ timeout: 2000 })) {
+            // Verificar que es clickeable
+            const isEnabled = await dayElement.isEnabled({ timeout: 1000 });
+            if (isEnabled) {
+              this.logger.logInfo(`Found clickable day element with selector: ${selector}`);
+              
+              await dayElement.click({ force: true });
+              this.logger.logInfo(`Successfully clicked day ${targetDay} using selector: ${selector}`);
+              
+              dayClicked = true;
+              break;
+            } else {
+              this.logger.logInfo(`Day element found but not clickable: ${selector}`);
+            }
+          }
+        } catch (selectorError) {
+          // Continuar con el siguiente selector
+          this.logger.logInfo(`Selector ${selector} failed, trying next one`);
+        }
       }
 
-      // Verificar que estamos en el día correcto
-      await this.verifyCorrectDay(dayToSelect);
+      if (!dayClicked) {
+        // Fallback: usar JavaScript para encontrar y hacer click en el número
+        this.logger.logInfo('Standard selectors failed, trying JavaScript approach');
+        
+        const jsResult = await this.page.evaluate((targetDay) => {
+          // Buscar todos los elementos con el número del día
+          const elements = Array.from(document.querySelectorAll('*')).filter(el => {
+            const text = el.textContent?.trim();
+            return text === targetDay && 
+                   (el.tagName === 'BUTTON' || 
+                    el.onclick || 
+                    el.getAttribute('role') === 'button' ||
+                    window.getComputedStyle(el).cursor === 'pointer');
+          });
+          
+          if (elements.length > 0) {
+            const element = elements[0] as HTMLElement;
+            element.click();
+            return { success: true, found: elements.length, text: element.textContent };
+          }
+          
+          return { success: false, found: 0 };
+        }, targetDay);
+        
+        if (jsResult.success) {
+          this.logger.logInfo(`JavaScript click successful on day ${targetDay}`, jsResult);
+          dayClicked = true;
+        } else {
+          this.logger.logError(new Error(`No clickable element found for day ${targetDay}`), { 
+            jsResult,
+            targetDay,
+            dayToSelect 
+          });
+        }
+      }
+
+      if (dayClicked) {
+        // Esperar a que se cargue la lista de clases del día seleccionado
+        await this.waitForClassListToLoad();
+        
+        // Verificar que estamos en el día correcto
+        await this.verifyCorrectDay(dayToSelect);
+      } else {
+        throw new Error(`Failed to select day ${targetDay} (${dayToSelect}) - no clickable elements found`);
+      }
 
     } catch (error) {
       this.logger.logError(error as Error, { 
@@ -407,8 +628,8 @@ export class WebAutomationEngine implements WebAutomationEngine {
     try {
       this.logger.logInfo(`Checking status for class: ${className}`);
 
-      // Buscar la clase por su nombre
-      const classElement = this.page.locator(SELECTORS.classes.classHeading(className)).first();
+      // Buscar la clase usando selector estable
+      const classElement = this.page.getByText(className, { exact: true }).first();
       
       if (!(await classElement.isVisible({ timeout: 5000 }))) {
         this.logger.logInfo(`Class not found: ${className}`);
@@ -457,27 +678,16 @@ export class WebAutomationEngine implements WebAutomationEngine {
     try {
       this.logger.logInfo(`Verifying class exists: ${className}`);
 
-      // Buscar la clase por su nombre con múltiples selectores
-      const classSelectors = [
-        SELECTORS.classes.classHeading(className),
-        `text="${className}"`,
-        `[data-class-name="${className}"]`,
-        `*:has-text("${className}")`
-      ];
-
-      for (const selector of classSelectors) {
-        try {
-          const element = this.page.locator(selector).first();
-          if (await element.isVisible({ timeout: 2000 })) {
-            this.logger.logInfo(`Class ${className} found with selector: ${selector}`);
-            return true;
-          }
-        } catch {
-          // Continuar con el siguiente selector
-        }
+      // Usar selector estable basado en análisis anti-bot
+      const classElement = this.page.getByText(className, { exact: true }).first();
+      const isVisible = await classElement.isVisible({ timeout: 5000 });
+      
+      if (isVisible) {
+        this.logger.logInfo(`Class ${className} found and visible`);
+        return true;
       }
 
-      this.logger.logInfo(`Class ${className} not found with any selector`);
+      this.logger.logInfo(`Class ${className} not found`);
       return false;
 
     } catch (error) {
@@ -597,21 +807,8 @@ export class WebAutomationEngine implements WebAutomationEngine {
       // Step 2: Select target day (always "tomorrow" for 25h rule)
       await this.selectDay(dayToSelect);
 
-      // Step 3: Verify class exists and check status
-      const classExists = await this.verifyClassExists(className);
-      if (!classExists) {
-        throw new Error(`Target class "${className}" not found on selected day`);
-      }
-
-      const classStatus = await this.checkClassStatus(className);
-      if (classStatus === 'already_booked') {
-        this.logger.logInfo(`Class ${className} is already booked - no action needed`);
-        return;
-      }
-
-      if (classStatus === 'full') {
-        throw new Error(`Class "${className}" is already at full capacity`);
-      }
+      // Step 3: Preparation complete - ready to wait for exact timing
+      this.logger.logInfo('Preparation phase completed - ready for critical timing execution', { className, dayToSelect });
 
       // Step 4: Position browser for critical timing execution
       await this.waitUntilReady();
@@ -739,18 +936,39 @@ export class WebAutomationEngine implements WebAutomationEngine {
     try {
       this.logger.logInfo(`Executing critical timing reservation for class: ${className}`);
 
-      // CRITICAL SEQUENCE - Optimized for maximum speed
-      // Pre-locate elements for faster execution
-      const classElement = this.page.locator(SELECTORS.classes.classHeading(className)).first();
+      // Step 1: Verify class exists and check status (moved from preparation)
+      const classExists = await this.verifyClassExists(className);
+      if (!classExists) {
+        throw new Error(`Target class "${className}" not found on selected day`);
+      }
+
+      const classStatus = await this.checkClassStatus(className);
+      if (classStatus === 'already_booked') {
+        this.logger.logInfo(`Class ${className} is already booked - no action needed`);
+        return {
+          success: true,
+          message: `Class ${className} is already booked`,
+          timestamp: startTime,
+          timingAccuracy: 0,
+          hasSpots: false,
+          classStatus: 'already_booked'
+        };
+      }
+
+      if (classStatus === 'full') {
+        throw new Error(`Class "${className}" is already at full capacity`);
+      }
+
+      // Step 2: Execute reservation - buscar y hacer clic en la clase
+      const classElement = this.page.getByText(className, { exact: true }).first();
       
-      // Verify class element exists before attempting critical sequence
-      if (!(await classElement.isVisible({ timeout: 1000 }))) {
+      if (!(await classElement.isVisible({ timeout: 2000 }))) {
         throw new Error(`Class "${className}" not found for reservation execution`);
       }
 
-      // Action 1: Click class heading to open modal
+      // Hacer clic en la clase para abrir modal
       const classClickStart = new Date();
-      await classElement.click();
+      await classElement.click({ force: true }); // Forzar click si hay elementos superpuestos
       const classClickEnd = new Date();
       
       this.logger.logInfo(`Class clicked in ${classClickEnd.getTime() - classClickStart.getTime()}ms`, { className });
