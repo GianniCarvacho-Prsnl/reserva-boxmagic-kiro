@@ -13,14 +13,6 @@
       "schedule": "0 23 * * 0"
     }
   ],
-  "env": {
-    "BOXMAGIC_EMAIL": "@boxmagic_email",
-    "BOXMAGIC_PASSWORD": "@boxmagic_password",
-    "TIMEZONE": "America/Santiago",
-    "WEBHOOK_URL": "@webhook_url",
-    "BROWSER_HEADLESS": "true",
-    "NOTIFICATIONS_ENABLED": "true"
-  },
   "build": {
     "env": {
       "NODE_ENV": "production"
