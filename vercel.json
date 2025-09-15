@@ -26,7 +26,7 @@
       "NODE_ENV": "production"
     }
   },
-  "regions": ["scl1"],
+  "regions": ["gru1"],
   "rewrites": [
     {
       "source": "/health",
