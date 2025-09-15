@@ -1,7 +1,6 @@
 // Main entry point for the CrossFit reservation bot
 import { ReservationBot } from './core/ReservationBot.js';
 import { Logger } from './core/Logger.js';
-import { calculateNextReservationTime } from './utils/timing.js';
 
 async function main() {
   const logger = new Logger();
