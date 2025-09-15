@@ -11,5 +11,9 @@
       "cronExpression": "30 23 * * 0",
       "description": "CrossFit Lunes 18:00 (reserva TODOS los domingos 23:00)"
     }
-  ]
+  ],
+  "notifications": {
+    "enabled": false,
+    "webhookUrl": ""
+  }
 }
