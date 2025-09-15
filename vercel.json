@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/api/reserve?scheduleId=crossfit-lunes-18",
-      "schedule": "30 23 * * *"
+      "schedule": "45 23 * * *"
     }
   ],
   "build": {
