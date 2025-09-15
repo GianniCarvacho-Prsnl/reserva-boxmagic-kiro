@@ -502,9 +502,6 @@ export class ReservationBot {
       throw new Error(`Schedule ${schedule.id} missing reservationHour or reservationDay`);
     }
     
-    const config = this.configManager.getCurrentConfig();
-    const timezone = config?.timezone || 'America/Santiago';
-    
     return calculateNextReservationTime(schedule.reservationHour, schedule.reservationDay);
   }
 
