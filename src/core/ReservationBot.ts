@@ -505,7 +505,7 @@ export class ReservationBot {
     const config = this.configManager.getCurrentConfig();
     const timezone = config?.timezone || 'America/Santiago';
     
-    return calculateNextReservationTime(schedule.reservationHour, schedule.reservationDay, timezone);
+    return calculateNextReservationTime(schedule.reservationHour, schedule.reservationDay);
   }
 
   /**
