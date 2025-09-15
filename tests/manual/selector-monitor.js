@@ -3,7 +3,7 @@
  * Detecta cambios en IDs, clases y otros selectores para analizar posibles controles anti-automatización
  */
 
-import { chromium } from 'playwright';
+import { launchChromium } from 'playwright-aws-lambda';
 import { writeFileSync, existsSync, readFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -37,7 +37,7 @@ class SelectorMonitor {
   async initialize() {
     console.log(`🚀 Iniciando monitoreo - Run ID: ${this.runId}`);
     
-    this.browser = await chromium.launch({
+    this.browser = await launchChromium({
       headless: false, // Para poder ver lo que sucede
       channel: 'chrome',
       args: [

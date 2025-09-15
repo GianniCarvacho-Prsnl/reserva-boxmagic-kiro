@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { launchChromium } from 'playwright-aws-lambda';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -11,7 +11,7 @@ async function testVisualFlow() {
     console.log('(El navegador se mantendrá ABIERTO para que veas cada paso)\n');
     
     // Configurar navegador VISIBLE
-    browser = await chromium.launch({
+    browser = await launchChromium({
       headless: false, // VISIBLE
       channel: 'chrome',
       args: ['--no-sandbox', '--disable-setuid-sandbox']

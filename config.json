@@ -1,15 +1,15 @@
 {
   "schedules": [
     {
-      "id": "crossfit-lunes-18",
+      "id": "test-crossfit-0700",
       "dayToSelect": "tomorrow",
       "className": "07:00 CrossFit",
-      "reservationHour": "23:59",
-      "reservationDay": "sunday",
+      "reservationHour": "11:05",
+      "reservationDay": "monday",
       "bufferSeconds": 30,
       "enabled": true,
-      "cronExpression": "59 23 * * 0",
-      "description": "CrossFit Lunes 18:00 (reserva TODOS los domingos 23:00)"
+      "cronExpression": "5 11 * * 1",
+      "description": "PRUEBA VERCEL: CrossFit 07:00 martes (reserva hoy lunes 11:05)"
     }
   ],
   "notifications": {

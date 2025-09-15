@@ -120,7 +120,9 @@ BOXMAGIC_PASSWORD=your-password
 WEBHOOK_URL=https://your-webhook-endpoint
 TIMEZONE=America/Santiago
 BROWSER_HEADLESS=true
-NOTIFICATIONS_ENABLED=true
+NOTIFICATIONS_ENABLED=false    # Set to false to disable webhook requirement
+BROWSER_TIMEOUT=30000
+NODE_ENV=production             # Set by Vercel automatically
 ```
 
 ### Proven Successful Implementation

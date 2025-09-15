@@ -1,4 +1,4 @@
-import { Page } from 'playwright';
+import { Page } from 'playwright-core';
 import { Logger } from '../core/Logger';
 import { ErrorType } from '../types/ErrorTypes';
 import { RetryStrategyManager } from './RetryStrategy';

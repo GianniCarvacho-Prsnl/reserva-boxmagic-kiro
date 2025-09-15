@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { launchChromium } from 'playwright-aws-lambda';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -10,7 +10,7 @@ async function testFixedDaySelection() {
   try {
     console.log('🧪 PROBANDO LA SELECCIÓN DE DÍA ARREGLADA...');
     
-    browser = await chromium.launch({
+    browser = await launchChromium({
       headless: false,
       channel: 'chrome',
       args: ['--no-sandbox', '--disable-setuid-sandbox']

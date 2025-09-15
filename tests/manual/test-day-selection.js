@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { launchChromium } from 'playwright-aws-lambda';
 import dotenv from 'dotenv';
 
 // Cargar variables de entorno
@@ -23,7 +23,7 @@ async function testDaySelection() {
     console.log('🚀 Iniciando test de selección de día...');
     
     // Configurar navegador (sin headless para ver lo que pasa)
-    browser = await chromium.launch({
+    browser = await launchChromium({
       headless: false, // Cambiar a true si quieres que sea invisible
       channel: 'chrome',
       args: [

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import { launchChromium } from 'playwright-aws-lambda';
+import type { Browser, Page, BrowserContext } from 'playwright-core';
 import { EdgeCaseHandler } from '../../src/utils/EdgeCaseHandler';
 import { Logger } from '../../src/core/Logger';
 import { ErrorType } from '../../src/types/ErrorTypes';
@@ -12,7 +13,7 @@ describe('Edge Case Handler Integration Tests', () => {
   let edgeCaseHandler: EdgeCaseHandler;
 
   beforeEach(async () => {
-    browser = await chromium.launch({ headless: true });
+    browser = await launchChromium({ headless: true });
     context = await browser.newContext();
     page = await context.newPage();
     logger = new Logger();

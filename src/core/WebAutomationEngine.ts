@@ -1,5 +1,5 @@
-import { chromium } from 'playwright';
-import type { Browser, BrowserContext, Page } from 'playwright';
+import { launchChromium } from 'playwright-aws-lambda';
+import type { Browser, BrowserContext, Page } from 'playwright-core';
 import { Logger } from './Logger.js';
 import type { ReservationResult } from '../types/ReservationTypes.js';
 
@@ -94,13 +94,9 @@ export class WebAutomationEngine implements WebAutomationEngine {
       this.logger.logInfo('Initializing WebAutomationEngine with optimized browser configuration');
       
       // Configuración de navegador optimizada para evitar detección de BoxMagic
-      this.browser = await chromium.launch({
+      this.browser = await launchChromium({
         headless: process.env['BROWSER_HEADLESS'] !== 'false',
-        channel: 'chrome', // Usar Chrome en lugar de Chromium
         args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
           '--disable-blink-features=AutomationControlled', // Crítico: evitar detección
           '--disable-automation',
           '--no-first-run',
@@ -116,7 +112,6 @@ export class WebAutomationEngine implements WebAutomationEngine {
           '--password-store=basic',
           '--use-mock-keychain',
           '--no-default-browser-check',
-          '--no-first-run',
           '--disable-default-apps'
         ]
       });
