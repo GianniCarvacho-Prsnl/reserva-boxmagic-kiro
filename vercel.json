@@ -3,8 +3,7 @@
   "functions": {
     "api/reserve.ts": {
       "maxDuration": 60,
-      "memory": 1024,
-      "runtime": "@vercel/node@18"
+      "memory": 1024
     }
   },
   "crons": [
