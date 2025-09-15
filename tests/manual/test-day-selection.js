@@ -1,4 +1,5 @@
-import { launchChromium } from 'playwright-aws-lambda';
+import { chromium } from 'playwright-core';
+import chromiumBinary from '@sparticuz/chromium';
 import dotenv from 'dotenv';
 
 // Cargar variables de entorno
@@ -23,7 +24,9 @@ async function testDaySelection() {
     console.log('🚀 Iniciando test de selección de día...');
     
     // Configurar navegador (sin headless para ver lo que pasa)
-    browser = await launchChromium({
+    browser = await chromium.launch({
+    args: chromiumBinary.args,
+    executablePath: await chromiumBinary.executablePath(),{
       headless: false, // Cambiar a true si quieres que sea invisible
       channel: 'chrome',
       args: [

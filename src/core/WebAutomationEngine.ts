@@ -1,4 +1,5 @@
-import { launchChromium } from 'playwright-aws-lambda';
+import { chromium } from 'playwright-core';
+import chromiumBinary from '@sparticuz/chromium';
 import type { Browser, BrowserContext, Page } from 'playwright-core';
 import { Logger } from './Logger.js';
 import type { ReservationResult } from '../types/ReservationTypes.js';
@@ -93,28 +94,42 @@ export class WebAutomationEngine implements WebAutomationEngine {
     try {
       this.logger.logInfo('Initializing WebAutomationEngine with optimized browser configuration');
       
-      // Configuración de navegador optimizada para evitar detección de BoxMagic
-      this.browser = await launchChromium({
-        headless: process.env['BROWSER_HEADLESS'] !== 'false',
-        args: [
-          '--disable-blink-features=AutomationControlled', // Crítico: evitar detección
-          '--disable-automation',
-          '--no-first-run',
-          '--disable-infobars',
-          '--disable-extensions',
-          '--disable-plugins',
-          '--disable-images', // Acelerar carga
-          '--disable-javascript-harmony-shipping',
-          '--disable-background-timer-throttling',
-          '--disable-renderer-backgrounding',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-ipc-flooding-protection',
-          '--password-store=basic',
-          '--use-mock-keychain',
-          '--no-default-browser-check',
-          '--disable-default-apps'
-        ]
-      });
+      // Configuración híbrida: local para desarrollo, @sparticuz/chromium para producción
+      const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+      
+      const browserArgs = [
+        '--disable-blink-features=AutomationControlled', // Crítico: evitar detección
+        '--disable-automation',
+        '--no-first-run',
+        '--disable-infobars',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-images', // Acelerar carga
+        '--disable-javascript-harmony-shipping',
+        '--disable-background-timer-throttling',
+        '--disable-renderer-backgrounding',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-ipc-flooding-protection',
+        '--password-store=basic',
+        '--use-mock-keychain',
+        '--no-default-browser-check',
+        '--disable-default-apps'
+      ];
+
+      if (isProduction) {
+        // Vercel/Producción: usar @sparticuz/chromium
+        this.browser = await chromium.launch({
+          args: [...chromiumBinary.args, ...browserArgs],
+          executablePath: await chromiumBinary.executablePath(),
+          headless: process.env['BROWSER_HEADLESS'] !== 'false'
+        });
+      } else {
+        // Local: usar Chromium local de Playwright
+        this.browser = await chromium.launch({
+          args: browserArgs,
+          headless: process.env['BROWSER_HEADLESS'] !== 'false'
+        });
+      }
 
       this.context = await this.browser.newContext({
         viewport: { width: 1366, height: 768 }, // Tamaño más común

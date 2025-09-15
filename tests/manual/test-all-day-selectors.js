@@ -1,4 +1,5 @@
-import { launchChromium } from 'playwright-aws-lambda';
+import { chromium } from 'playwright-core';
+import chromiumBinary from '@sparticuz/chromium';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -9,7 +10,9 @@ async function testAllDaySelectors() {
   try {
     console.log('🔍 ANALIZANDO TODOS LOS SELECTORES DE DÍA...');
     
-    browser = await launchChromium({
+    browser = await chromium.launch({
+    args: chromiumBinary.args,
+    executablePath: await chromiumBinary.executablePath(),{
       headless: false,
       channel: 'chrome',
       args: ['--no-sandbox', '--disable-setuid-sandbox']

@@ -4,12 +4,12 @@
       "id": "test-crossfit-0700",
       "dayToSelect": "tomorrow",
       "className": "07:00 CrossFit",
-      "reservationHour": "11:05",
+      "reservationHour": "11:25",
       "reservationDay": "monday",
       "bufferSeconds": 30,
       "enabled": true,
-      "cronExpression": "5 11 * * 1",
-      "description": "PRUEBA VERCEL: CrossFit 07:00 martes (reserva hoy lunes 11:05)"
+      "cronExpression": "25 11 * * 1",
+      "description": "PRUEBA @sparticuz/chromium: CrossFit 07:00 martes (reserva hoy lunes 11:25)"
     }
   ],
   "notifications": {
