@@ -4,12 +4,12 @@
       "id": "test-crossfit-0700",
       "dayToSelect": "tomorrow",
       "className": "07:00 CrossFit",
-      "reservationHour": "11:25",
+      "reservationHour": "15:45",
       "reservationDay": "monday",
       "bufferSeconds": 30,
       "enabled": true,
-      "cronExpression": "25 11 * * 1",
-      "description": "PRUEBA @sparticuz/chromium: CrossFit 07:00 martes (reserva hoy lunes 11:25)"
+      "cronExpression": "45 15 * * 1",
+      "description": "PRUEBA @sparticuz/chromium: CrossFit 07:00 martes (reserva hoy lunes 15:45)"
     }
   ],
   "notifications": {
