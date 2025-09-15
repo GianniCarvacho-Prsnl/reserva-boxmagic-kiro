@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏋️ BoxMagic Reservas Bot - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .dashboard {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 2rem;
+            max-width: 800px;
+            width: 90%;
+            margin: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f7fafc;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #48bb78;
+        }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .day-header {
+            text-align: center;
+            font-weight: 600;
+            color: #4a5568;
+            padding: 0.5rem;
+            background: #edf2f7;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .day-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 1rem;
+            min-height: 120px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .day-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .day-card.has-class {
+            border-color: #e2e8f0;
+        }
+
+        .day-card.pending {
+            border-color: #f6ad55;
+            background: #fffbf0;
+        }
+
+        .day-card.success {
+            border-color: #68d391;
+            background: #f0fff4;
+        }
+
+        .day-card.error {
+            border-color: #fc8181;
+            background: #fff5f5;
+        }
+
+        .day-number {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: #2d3748;
+        }
+
+        .class-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .class-time {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        .class-name {
+            font-size: 0.8rem;
+            color: #718096;
+        }
+
+        .class-status {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 0.3rem;
+        }
+
+        .status-pending {
+            background: #fef5e7;
+            color: #c05621;
+        }
+
+        .status-success {
+            background: #f0fff4;
+            color: #22543d;
+        }
+
+        .status-error {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .next-execution {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .next-execution h3 {
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .countdown {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .next-class {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .loading {
+            text-align: center;
+            color: #718096;
+            font-style: italic;
+        }
+
+        .error-message {
+            background: #fed7d7;
+            color: #742a2a;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .calendar {
+                grid-template-columns: repeat(7, 1fr);
+                gap: 0.5rem;
+            }
+            
+            .day-card {
+                padding: 0.5rem;
+                min-height: 80px;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🏋️ BoxMagic Reservas Bot</h1>
+            <div class="status-bar">
+                <div class="status-indicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="systemStatus">Sistema: Cargando...</span>
+                </div>
+                <div id="lastUpdate">Última actualización: --:--</div>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+        <div class="calendar">
+            <div class="day-header">LUN</div>
+            <div class="day-header">MAR</div>
+            <div class="day-header">MIE</div>
+            <div class="day-header">JUE</div>
+            <div class="day-header">VIE</div>
+            <div class="day-header">SAB</div>
+            <div class="day-header">DOM</div>
+            
+            <div class="day-card" id="monday">
+                <div class="day-number">Lun</div>
+                <div class="class-info loading">Cargando...</div>
+            </div>
+            <div class="day-card" id="tuesday">
+                <div class="day-number">Mar</div>
+                <div class="class-info loading">Cargando...</div>
+            </div>
+            <div class="day-card" id="wednesday">
+                <div class="day-number">Mié</div>
+                <div class="class-info loading">Cargando...</div>
+            </div>
+            <div class="day-card" id="thursday">
+                <div class="day-number">Jue</div>
+                <div class="class-info loading">Cargando...</div>
+            </div>
+            <div class="day-card" id="friday">
+                <div class="day-number">Vie</div>
+                <div class="class-info loading">Cargando...</div>
+            </div>
+            <div class="day-card" id="saturday">
+                <div class="day-number">Sáb</div>
+                <div class="class-info loading">Cargando...</div>
+            </div>
+            <div class="day-card" id="sunday">
+                <div class="day-number">Dom</div>
+                <div class="class-info loading">Cargando...</div>
+            </div>
+        </div>
+
+        <div class="next-execution">
+            <h3>⏰ Próxima Ejecución</h3>
+            <div class="countdown" id="countdown">--:--:--</div>
+            <div class="next-class" id="nextClass">Cargando información...</div>
+        </div>
+    </div>
+
+    <script>
+        class DashboardApp {
+            constructor() {
+                this.config = null;
+                this.systemStatus = null;
+                this.init();
+            }
+
+            async init() {
+                await this.loadData();
+                this.updateUI();
+                this.startAutoRefresh();
+                this.startCountdown();
+            }
+
+            async loadData() {
+                try {
+                    // Cargar estado del sistema
+                    const statusResponse = await fetch('/api/reserve?status=true');
+                    this.systemStatus = await statusResponse.json();
+                    
+                    // Simular configuración basada en el config.json actual
+                    this.config = {
+                        schedules: [
+                            {
+                                id: 'crossfit-lunes-18',
+                                dayToSelect: 'tomorrow',
+                                className: '07:00 CrossFit',
+                                reservationHour: '23:45',
+                                reservationDay: 'sunday',
+                                enabled: true,
+                                day: 'monday'
+                            }
+                        ]
+                    };
+
+                    this.hideError();
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    this.showError('Error conectando con la API. Reintentando...');
+                }
+            }
+
+            updateUI() {
+                this.updateSystemStatus();
+                this.updateCalendar();
+                this.updateLastUpdateTime();
+            }
+
+            updateSystemStatus() {
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('systemStatus');
+                
+                if (this.systemStatus && this.systemStatus.success) {
+                    statusDot.style.background = '#48bb78';
+                    statusText.textContent = '✅ Sistema Activo';
+                } else {
+                    statusDot.style.background = '#f56565';
+                    statusText.textContent = '❌ Sistema con Errores';
+                }
+            }
+
+            updateCalendar() {
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+                
+                days.forEach((dayId, index) => {
+                    const dayCard = document.getElementById(dayId);
+                    const dayNumber = dayCard.querySelector('.day-number');
+                    const classInfo = dayCard.querySelector('.class-info');
+                    
+                    // Actualizar número del día con fecha actual
+                    const today = new Date();
+                    const dayDate = new Date(today);
+                    dayDate.setDate(today.getDate() + (index - today.getDay() + 1));
+                    dayNumber.textContent = `${dayNames[index]} ${dayDate.getDate()}`;
+                    
+                    // Buscar si hay clase configurada para este día
+                    const schedule = this.config?.schedules.find(s => {
+                        const scheduleDay = this.mapDayToIndex(s.reservationDay);
+                        return scheduleDay === index;
+                    });
+                    
+                    if (schedule) {
+                        dayCard.classList.add('has-class');
+                        
+                        // Determinar estado de la reserva
+                        const now = new Date();
+                        const nextExecution = this.getNextExecutionTime(schedule);
+                        const isPending = nextExecution > now;
+                        
+                        let statusClass = 'pending';
+                        let statusText = 'Pendiente';
+                        
+                        if (!isPending) {
+                            // Aquí podrías consultar el resultado real de la última ejecución
+                            statusClass = 'success'; // Simular éxito por ahora
+                            statusText = 'Reservada';
+                        }
+                        
+                        dayCard.classList.add(statusClass);
+                        
+                        classInfo.innerHTML = `
+                            <div class="class-time">${schedule.className}</div>
+                            <div class="class-name">Ejecución: ${schedule.reservationHour}</div>
+                            <div class="class-status status-${statusClass}">${statusText}</div>
+                        `;
+                    } else {
+                        classInfo.innerHTML = '<div style="color: #a0aec0; font-size: 0.8rem;">Sin clase</div>';
+                        dayCard.classList.remove('has-class', 'pending', 'success', 'error');
+                    }
+                });
+            }
+
+            mapDayToIndex(dayName) {
+                const dayMap = {
+                    'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+                    'friday': 4, 'saturday': 5, 'sunday': 6
+                };
+                return dayMap[dayName] || 0;
+            }
+
+            getNextExecutionTime(schedule) {
+                const now = new Date();
+                const [hour, minute] = schedule.reservationHour.split(':').map(Number);
+                
+                // Crear fecha para la próxima ejecución
+                const nextExecution = new Date();
+                nextExecution.setHours(hour, minute, 0, 0);
+                
+                // Si ya pasó hoy, mover a mañana
+                if (nextExecution <= now) {
+                    nextExecution.setDate(nextExecution.getDate() + 1);
+                }
+                
+                return nextExecution;
+            }
+
+            startCountdown() {
+                setInterval(() => {
+                    this.updateCountdown();
+                }, 1000);
+            }
+
+            updateCountdown() {
+                if (!this.config?.schedules?.length) return;
+                
+                const schedule = this.config.schedules[0]; // Usar la primera clase configurada
+                const nextExecution = this.getNextExecutionTime(schedule);
+                const now = new Date();
+                const timeDiff = nextExecution - now;
+                
+                if (timeDiff > 0) {
+                    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+                    
+                    document.getElementById('countdown').textContent = 
+                        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    
+                    document.getElementById('nextClass').textContent = 
+                        `Próxima reserva: ${schedule.className} a las ${schedule.reservationHour}`;
+                } else {
+                    document.getElementById('countdown').textContent = 'Ejecutando...';
+                    document.getElementById('nextClass').textContent = 'Proceso en curso';
+                }
+            }
+
+            updateLastUpdateTime() {
+                const now = new Date();
+                document.getElementById('lastUpdate').textContent = 
+                    `Última actualización: ${now.toLocaleTimeString()}`;
+            }
+
+            startAutoRefresh() {
+                // Actualizar datos cada 30 segundos
+                setInterval(async () => {
+                    await this.loadData();
+                    this.updateUI();
+                }, 30000);
+            }
+
+            showError(message) {
+                const errorDiv = document.getElementById('errorMessage');
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            }
+
+            hideError() {
+                document.getElementById('errorMessage').style.display = 'none';
+            }
+        }
+
+        // Inicializar la aplicación cuando se carga la página
+        document.addEventListener('DOMContentLoaded', () => {
+            new DashboardApp();
+        });
+    </script>
+</body>
+</html>
