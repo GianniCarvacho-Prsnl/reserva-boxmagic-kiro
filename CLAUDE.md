@@ -25,12 +25,21 @@ npm run vercel:dev      # Run Vercel development server
 npm run vercel:deploy   # Deploy to Vercel
 npm run fly:deploy      # Deploy to Fly.io
 npm run fly:logs        # View Fly.io logs
+
+# Additional utilities
+npm run clean           # Remove dist/ directory
 ```
 
 ### Playwright Commands
 ```bash
 # Install required browsers (run after npm install)
 npx playwright install
+```
+
+### Manual Testing
+```bash
+# Run the main visual test flow
+node tests/manual/test-visual-flow.js
 ```
 
 ## Architecture Overview
@@ -78,17 +87,20 @@ The bot implements the "25-hour rule" for BoxMagic reservations:
 
 ### Configuration Files
 
-- `config.json` - Reservation schedules (not committed, use config.example.json)
-- `.env` - Credentials and environment variables
+- `config.json` - Reservation schedules (not committed, use config.example.json as template)
+- `.env` - Credentials and environment variables (use .env.example as template)
 - `vercel.json` - Vercel deployment with cron scheduling
 - `webhook-config.example.json` - Webhook notification examples
+- `tsconfig.json` - TypeScript configuration with ESM support
+- `vitest.config.ts` - Vitest test runner configuration
 
 ### Testing Structure
 
 - `tests/unit/` - Unit tests for individual components
 - `tests/integration/` - Integration tests for web automation and timing
 - `tests/manual/` - Manual testing scenarios and validation scripts
-- Uses Vitest as test runner with proper ESM support
+  - `test-visual-flow.js` - **Primary manual test** showing complete reservation flow
+- Uses Vitest as test runner with proper ESM support and coverage reporting
 
 ### Important Development Notes
 
