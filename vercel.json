@@ -9,28 +9,8 @@
   },
   "crons": [
     {
-      "path": "/api/reserve?scheduleId=metcon-viernes-18",
-      "schedule": "0 17 * * 4"
-    },
-    {
       "path": "/api/reserve?scheduleId=crossfit-lunes-18",
-      "schedule": "0 17 * * 0"
-    },
-    {
-      "path": "/api/reserve?scheduleId=crossfit-martes-19",
-      "schedule": "0 18 * * 1"
-    },
-    {
-      "path": "/api/reserve?scheduleId=crossfit-miercoles-18",
-      "schedule": "0 17 * * 2"
-    },
-    {
-      "path": "/api/reserve?scheduleId=crossfit-jueves-19",
-      "schedule": "0 18 * * 3"
-    },
-    {
-      "path": "/api/reserve?scheduleId=crossfit-sabado-10",
-      "schedule": "0 9 * * 5"
+      "schedule": "0 23 * * 0"
     }
   ],
   "env": {
