@@ -4,11 +4,11 @@
       "id": "crossfit-lunes-18",
       "dayToSelect": "tomorrow",
       "className": "07:00 CrossFit",
-      "reservationHour": "23:45",
+      "reservationHour": "23:59",
       "reservationDay": "sunday",
       "bufferSeconds": 30,
       "enabled": true,
-      "cronExpression": "45 23 * * 0",
+      "cronExpression": "59 23 * * 0",
       "description": "CrossFit Lunes 18:00 (reserva TODOS los domingos 23:00)"
     }
   ],
