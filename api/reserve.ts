@@ -16,8 +16,8 @@
  * - /api/reserve?status=true - Get system status
  */
 
-// Import the Vercel handler from the compiled source
-import handler from '../dist/handlers/vercel.js';
+// Import the Vercel handler directly from source
+import handler from '../src/handlers/vercel.js';
 
 // Export as default for Vercel Functions
 export default handler;

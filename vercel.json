@@ -1,10 +1,10 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
   "functions": {
-    "api/reserve.ts": {
+    "api/**/*.ts": {
       "runtime": "nodejs20.x",
-      "maxDuration": 60,
-      "memory": 1024
+      "maxDuration": 60
     }
   },
   "crons": [
