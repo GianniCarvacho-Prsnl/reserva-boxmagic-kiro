@@ -19,28 +19,19 @@ export const SELECTORS = {
     tomorrowButton: '.Ui2Boton:has-text("Mañana")'
   },
   classes: {
-    // Selectores estables basados en análisis - usar getByRole y getByText
-    classHeading: (className: string) => `heading:has-text("${className}")`,
-    classButton: (className: string) => `button:has-text("${className}")`,
-    classLink: (className: string) => `link:has-text("${className}")`,
-    // Clases específicas detectadas como estables
-    crossfit07: 'text="07:00 CrossFit"',
-    crossfit08: 'text="08:00 CrossFit"', 
-    crossfit17: 'text="17:00 CrossFit"',
-    crossfit18: 'text="18:00 CrossFit"',
-    crossfit19: 'text="19:00 CrossFit"',
-    crossfit20: 'text="20:00 CrossFit"',
-    gymnastics: 'text="Gymnastics"',
-    weightlifting: 'text="Weightlifting"',
-    competitor: 'text="Competitor"',
-    functionalGainz: 'text="Functional Gainz"',
+    // Selectores genéricos dinámicos basados en análisis real de BoxMagic
+    // Usar getByRole/getByText de Playwright en lugar de CSS selectors con :has()
+    classContainer: (className: string) => `.tarjetaInstancia >> text="${className}"`,
+    classHeading: (className: string) => `h2:text("${className}")`,
+    classHeadingExact: (className: string) => `h2 >> text="${className}"`,
+    // Selectores de estado
     availableSpaces: 'text=Espacios disponibles',
     fullCapacity: 'text=Capacidad completa', 
     alreadyBooked: 'text=Agendada'
   },
   modal: {
-    reserveButton: 'button:has-text("Agendar"), [role="button"]:has-text("Agendar")',
-    reservingButton: 'button:has-text("Agendando"), button:has-text("Reservando")',
+    reserveButton: '.contenidoBoton:has-text("Agendar"), button:has-text("Agendar"), [role="button"]:has-text("Agendar")',
+    reservingButton: '.contenidoBoton:has-text("Agendando"), button:has-text("Agendando"), button:has-text("Reservando")',
     closeButton: 'button:has-text("×"), button:has-text("Cerrar"), [aria-label*="close" i]',
     participantInfo: 'text=Participantes',
     modalContainer: '[role="dialog"], dialog, *:has(text="Agendar")'
@@ -441,7 +432,7 @@ export class WebAutomationEngine implements WebAutomationEngine {
             const text = el.textContent?.trim();
             return text === targetDay && 
                    (el.tagName === 'BUTTON' || 
-                    el.onclick || 
+                    el.getAttribute('onclick') || 
                     el.getAttribute('role') === 'button' ||
                     window.getComputedStyle(el).cursor === 'pointer');
           });
@@ -628,16 +619,16 @@ export class WebAutomationEngine implements WebAutomationEngine {
     try {
       this.logger.logInfo(`Checking status for class: ${className}`);
 
-      // Buscar la clase usando selector estable
-      const classElement = this.page.getByText(className, { exact: true }).first();
+      // Buscar el contenedor de la clase usando métodos Playwright específicos
+      const classHeading = this.page.getByRole('heading', { name: className, exact: true }).first();
       
-      if (!(await classElement.isVisible({ timeout: 5000 }))) {
+      if (!(await classHeading.isVisible({ timeout: 5000 }))) {
         this.logger.logInfo(`Class not found: ${className}`);
         return 'not_found';
       }
 
-      // Buscar el contenedor padre de la clase para verificar su estado
-      const classContainer = classElement.locator('..').first();
+      // Encontrar el contenedor padre de la clase
+      const classContainer = classHeading.locator('..').locator('..').locator('..').first();
 
       // Verificar si ya está agendada
       if (await classContainer.locator(SELECTORS.classes.alreadyBooked).isVisible({ timeout: 1000 })) {
@@ -678,9 +669,9 @@ export class WebAutomationEngine implements WebAutomationEngine {
     try {
       this.logger.logInfo(`Verifying class exists: ${className}`);
 
-      // Usar selector estable basado en análisis anti-bot
-      const classElement = this.page.getByText(className, { exact: true }).first();
-      const isVisible = await classElement.isVisible({ timeout: 5000 });
+      // Usar métodos Playwright específicos para buscar por texto de heading
+      const classHeading = this.page.getByRole('heading', { name: className, exact: true }).first();
+      const isVisible = await classHeading.isVisible({ timeout: 5000 });
       
       if (isVisible) {
         this.logger.logInfo(`Class ${className} found and visible`);
@@ -813,13 +804,10 @@ export class WebAutomationEngine implements WebAutomationEngine {
       // Step 4: Position browser for critical timing execution
       await this.waitUntilReady();
 
-      // Step 5: Final verification that everything is ready
-      await this.verifyReadyForCriticalExecution(className);
-
+      // Preparation complete - class verification will happen during critical execution
       this.logger.logInfo('Reservation preparation completed successfully', { 
         className, 
-        dayToSelect,
-        classStatus 
+        dayToSelect
       });
 
     } catch (error) {
@@ -832,74 +820,7 @@ export class WebAutomationEngine implements WebAutomationEngine {
     }
   }
 
-  /**
-   * Verify all elements are ready for critical timing execution
-   * Requirements 6.2: Ensure browser is positioned correctly
-   */
-  private async verifyReadyForCriticalExecution(className: string): Promise<void> {
-    if (!this.page) {
-      throw new Error('Page not available');
-    }
 
-    try {
-      this.logger.logInfo('Verifying readiness for critical execution', { className });
-
-      // Verify class is visible and clickable
-      const classElement = this.page.locator(SELECTORS.classes.classHeading(className)).first();
-      
-      if (!(await classElement.isVisible({ timeout: 5000 }))) {
-        throw new Error(`Class "${className}" is not visible for critical execution`);
-      }
-
-      // Verify class is not disabled or in an unclickable state
-      const isEnabled = await classElement.isEnabled({ timeout: 2000 });
-      if (!isEnabled) {
-        throw new Error(`Class "${className}" is not clickable for critical execution`);
-      }
-
-      // Verify page is stable (no ongoing loading)
-      await this.page.waitForLoadState('networkidle', { timeout: 5000 });
-
-      // Pre-locate elements for faster execution
-      await this.prelocateElementsForExecution(className);
-
-      this.logger.logInfo('Critical execution readiness verified', { className });
-
-    } catch (error) {
-      this.logger.logError(error as Error, { 
-        context: 'WebAutomationEngine.verifyReadyForCriticalExecution',
-        className 
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Pre-locate elements to optimize critical timing execution
-   * Requirements 6.3: Optimize for maximum speed
-   */
-  private async prelocateElementsForExecution(className: string): Promise<void> {
-    if (!this.page) return;
-
-    try {
-      // Pre-locate class element
-      const classElement = this.page.locator(SELECTORS.classes.classHeading(className)).first();
-      await classElement.waitFor({ timeout: 3000 });
-
-      // Verify modal elements will be available (without clicking yet)
-      // This helps ensure the modal system is ready
-      // const modalContainer = this.page.locator('[role="dialog"], .modal, [data-testid="modal"]').first();
-      
-      this.logger.logInfo('Elements pre-located for critical execution', { className });
-
-    } catch (error) {
-      this.logger.logError(error as Error, { 
-        context: 'WebAutomationEngine.prelocateElementsForExecution',
-        className 
-      });
-      // Don't throw here - this is optimization, not critical
-    }
-  }
 
   async waitUntilReady(): Promise<void> {
     if (!this.page) {
@@ -959,33 +880,65 @@ export class WebAutomationEngine implements WebAutomationEngine {
         throw new Error(`Class "${className}" is already at full capacity`);
       }
 
-      // Step 2: Execute reservation - buscar y hacer clic en la clase
-      const classElement = this.page.getByText(className, { exact: true }).first();
+      // Step 2: Execute reservation - buscar el heading y hacer clic en su contenedor clickable
+      const classHeading = this.page.getByRole('heading', { name: className, exact: true }).first();
       
-      if (!(await classElement.isVisible({ timeout: 2000 }))) {
+      if (!(await classHeading.isVisible({ timeout: 2000 }))) {
         throw new Error(`Class "${className}" not found for reservation execution`);
       }
 
-      // Hacer clic en la clase para abrir modal
+      // Encontrar el contenedor clickable (3 niveles arriba según análisis)
+      const classContainer = classHeading.locator('..').locator('..').locator('..').first();
+
+      // Hacer clic en el contenedor de la clase para abrir modal
       const classClickStart = new Date();
-      await classElement.click({ force: true }); // Forzar click si hay elementos superpuestos
+      await classContainer.click({ force: true }); // Forzar click si hay elementos superpuestos
       const classClickEnd = new Date();
       
       this.logger.logInfo(`Class clicked in ${classClickEnd.getTime() - classClickStart.getTime()}ms`, { className });
 
-      // Action 2: Wait for modal and click reserve button with optimized timing
+      // Action 2: Wait for modal and click reserve button with detailed timing logs
       const reserveButtonStart = new Date();
+      this.logger.logInfo(`Starting search for reserve button at ${reserveButtonStart.toISOString()}`, { className });
       
       try {
-        // Wait for reserve button with shorter timeout for speed
+        // Search for button with detailed timing logs
         const reserveButton = this.page.locator(SELECTORS.modal.reserveButton).first();
-        await reserveButton.waitFor({ timeout: 2000 });
         
-        // Click immediately when found
-        await reserveButton.click();
+        // Poll for button visibility with 100ms intervals and log progress
+        let buttonFound = false;
+        const maxAttempts = 50; // 5 seconds total
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const checkTime = new Date();
+          const isVisible = await reserveButton.isVisible();
+          
+          if (isVisible) {
+            const foundTime = new Date();
+            this.logger.logInfo(`Reserve button found after ${foundTime.getTime() - reserveButtonStart.getTime()}ms (attempt ${attempt + 1})`, { className });
+            buttonFound = true;
+            break;
+          }
+          
+          // Log every 500ms to track progress
+          if (attempt % 5 === 0) {
+            this.logger.logInfo(`Still searching for reserve button... ${checkTime.getTime() - reserveButtonStart.getTime()}ms elapsed (attempt ${attempt + 1}/${maxAttempts})`, { className });
+          }
+          
+          await this.page.waitForTimeout(100);
+        }
+        
+        if (!buttonFound) {
+          throw new Error(`Reserve button not found after ${maxAttempts * 100}ms`);
+        }
+        
+        // Click immediately when found with force to bypass intercepting elements
+        const clickStart = new Date();
+        await reserveButton.click({ force: true });
+        const clickEnd = new Date();
         
         const reserveButtonEnd = new Date();
-        this.logger.logInfo(`Reserve button clicked in ${reserveButtonEnd.getTime() - reserveButtonStart.getTime()}ms`, { className });
+        this.logger.logInfo(`Reserve button clicked successfully: find=${reserveButtonEnd.getTime() - reserveButtonStart.getTime()}ms, click=${clickEnd.getTime() - clickStart.getTime()}ms`, { className });
         
       } catch (modalError) {
         // If modal doesn't open, try alternative approach
@@ -1082,11 +1035,13 @@ export class WebAutomationEngine implements WebAutomationEngine {
       const executionResult = await this.page.evaluate((className) => {
         const startTime = Date.now();
         
-        // Find class element
+        // Find class container element using updated selector based on real BoxMagic structure
         const classSelectors = [
-          `h3:has-text("${className}")`,
-          `h4:has-text("${className}")`,
-          `[role="heading"]:has-text("${className}")`,
+          `.tarjetaInstancia:has(h2:contains("${className}"))`,
+          `h2:contains("${className}")`,
+          `h3:contains("${className}")`,
+          `h4:contains("${className}")`,
+          `[role="heading"]:contains("${className}")`,
           `*:contains("${className}")`
         ];
         

@@ -18,7 +18,7 @@ export const parseReservationTime = (isoString: string): Date => {
 /**
  * Convert reservationHour + reservationDay to next occurrence Date
  */
-export const calculateNextReservationTime = (hour: string, dayName: string, timezone: string = 'America/Santiago'): Date => {
+export const calculateNextReservationTime = (hour: string, dayName: string): Date => {
   const [hourNum, minuteNum] = hour.split(':').map(Number);
   
   const dayMap: { [key: string]: number } = {

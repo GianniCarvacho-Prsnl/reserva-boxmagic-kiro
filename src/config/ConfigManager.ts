@@ -300,14 +300,6 @@ export class ConfigManager {
     }
   }
 
-  private isValidISODateTime(dateTime: string): boolean {
-    try {
-      const date = new Date(dateTime);
-      return !isNaN(date.getTime()) && dateTime.includes('T');
-    } catch {
-      return false;
-    }
-  }
 
   private isValidTimezone(timezone: string): boolean {
     try {
